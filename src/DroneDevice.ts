@@ -1,4 +1,4 @@
-import { getReadingsAt } from './EnvironmentMap';
+import { getReadingsAt, neutralisePollution } from './EnvironmentMap';
 
 export enum DroneState {
     IDLE = 'IDLE',
@@ -81,13 +81,17 @@ export class DroneDevice {
         if (this.state === DroneState.GATHERING_DATA) drainRate = 0.2;
         else if (this.state === DroneState.IDLE) drainRate = 0.1;
         else if (this.state === DroneState.LOW_BATTERY) drainRate = 0.4;
-        else if (this.state === DroneState.INVESTIGATING_HAZARD) drainRate = 0.6;
+        else if (this.state === DroneState.INVESTIGATING_HAZARD) {
+            drainRate = 0.6;
+            neutralisePollution(this.currentLat, this.currentLng);
+        }
 
         this.batteryLevel -= drainRate;
         if (this.batteryLevel <= 0) {
-            this.batteryLevel = 0;
-            this.state = DroneState.OFFLINE;
-            return;
+            // Drone virtually swaps battery at base instantly for continuous loop simulation
+            this.batteryLevel = 100;
+            this.state = DroneState.IDLE;
+            this.setNewTarget();
         } else if (this.batteryLevel < 15) {
             this.state = DroneState.LOW_BATTERY;
         }
@@ -103,7 +107,13 @@ export class DroneDevice {
                 this.currentLat = this.targetLat;
                 this.currentLng = this.targetLng;
 
-                if (this.state !== DroneState.LOW_BATTERY) {
+                if (this.state === DroneState.INVESTIGATING_HAZARD) {
+                    // Force the Swarm drone to hover perfectly in place discharging neutralizers for 30 ticks!
+                    setTimeout(() => { 
+                        this.state = DroneState.IDLE;
+                        this.setNewTarget(); 
+                    }, 30000);
+                } else if (this.state !== DroneState.LOW_BATTERY) {
                     this.state = DroneState.GATHERING_DATA;
                     setTimeout(() => {
                         if (this.state !== DroneState.OFFLINE && this.state !== DroneState.LOW_BATTERY) {

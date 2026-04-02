@@ -68,8 +68,11 @@ app.post('/api/telemetry', (req, res) => {
                         }
                     }
                     if (!collisionFound) {
-                        const newAlert = createAlert.run(drone.location.lat, drone.location.lng, drone.airQuality.pm25);
-                        activeAlerts.push({ id: newAlert.lastInsertRowid, lat: drone.location.lat, lng: drone.location.lng, pm25: drone.airQuality.pm25, status: 'Active' });
+                        // Snap absolute grid coordinates to decouple the Danger Zone from the exact drone hardware origin
+                        const snapLat = Math.round(drone.location.lat * 100) / 100;
+                        const snapLng = Math.round(drone.location.lng * 100) / 100;
+                        const newAlert = createAlert.run(snapLat, snapLng, drone.airQuality.pm25);
+                        activeAlerts.push({ id: newAlert.lastInsertRowid, lat: snapLat, lng: snapLng, pm25: drone.airQuality.pm25, status: 'Active' });
                     }
                 }
             }
@@ -173,8 +176,8 @@ app.get('/api/analytics/hotspots', (req, res) => {
 
 app.get('/api/alerts/active', (req, res) => {
     try {
-        // Auto-close stale alerts that haven't received a drone pulse within 5 minutes
-        db.prepare("UPDATE HazardAlerts SET status = 'Resolved' WHERE status = 'Active' AND updated_at < datetime('now', '-5 minutes')").run();
+        // Rapid Auto-close: Alerts drop off immediately if the Swarm cleans the hazard and stops emitting > 150 anomalies for 45 seconds
+        db.prepare("UPDATE HazardAlerts SET status = 'Resolved' WHERE status = 'Active' AND updated_at < datetime('now', '-45 seconds')").run();
         
         // The frontend App.tsx AlertLayer expects a 'uuid' field for the react key, so we alias 'id'
         const query = "SELECT id as uuid, lat, lng, pm25 FROM HazardAlerts WHERE status = 'Active'";
