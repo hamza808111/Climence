@@ -20,6 +20,12 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+const defaultIcon = new L.Icon.Default();
+const hazardIcon = L.divIcon({
+  html: '<div class="w-5 h-5 bg-orange-500 rounded-full border-2 border-white animate-pulse shadow-lg shadow-orange-500/50 -ml-1 -mt-1"></div>',
+  className: 'bg-transparent',
+});
+
 interface TelemetryData {
   uuid: string;
   state: string;
@@ -270,7 +276,12 @@ export default function App() {
           {<AlertLayer />}
 
           {viewMode === 'markers' && drones.map(drone => (
-            <Marker key={drone.uuid} position={[drone.lat, drone.lng]} eventHandlers={{ click: () => setSelectedDroneId(drone.uuid) }} />
+            <Marker 
+                key={drone.uuid} 
+                position={[drone.lat, drone.lng]} 
+                icon={drone.state === 'INVESTIGATING_HAZARD' ? hazardIcon : defaultIcon}
+                eventHandlers={{ click: () => setSelectedDroneId(drone.uuid) }} 
+            />
           ))}
 
           {viewMode === 'heatmap' && <HeatmapLayer drones={drones} />}

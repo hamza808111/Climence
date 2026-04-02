@@ -5,7 +5,8 @@ export enum DroneState {
     EN_ROUTE = 'EN_ROUTE',
     GATHERING_DATA = 'GATHERING_DATA',
     LOW_BATTERY = 'LOW_BATTERY',
-    OFFLINE = 'OFFLINE'
+    OFFLINE = 'OFFLINE',
+    INVESTIGATING_HAZARD = 'INVESTIGATING_HAZARD'
 }
 
 export interface TelemetryData {
@@ -82,6 +83,12 @@ export class DroneDevice {
         }
     }
 
+    public overrideWaypoint(targetLat: number, targetLng: number, newState: DroneState) {
+        this.targetLat = targetLat;
+        this.targetLng = targetLng;
+        this.state = newState;
+    }
+
     public tick() {
         if (this.state === DroneState.OFFLINE) return;
 
@@ -104,8 +111,8 @@ export class DroneDevice {
             this.state = DroneState.LOW_BATTERY;
         }
 
-        // Move towards target if EN_ROUTE or LOW_BATTERY
-        if (this.state === DroneState.EN_ROUTE || this.state === DroneState.LOW_BATTERY) {
+        // Move towards target if EN_ROUTE, LOW_BATTERY, or INVESTIGATING_HAZARD
+        if (this.state === DroneState.EN_ROUTE || this.state === DroneState.LOW_BATTERY || this.state === DroneState.INVESTIGATING_HAZARD) {
             const step = 0.005; // ~500m per tick
             const latDiff = this.targetLat - this.currentLat;
             const lngDiff = this.targetLng - this.currentLng;
