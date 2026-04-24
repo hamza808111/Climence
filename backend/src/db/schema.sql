@@ -1,0 +1,24 @@
+CREATE TABLE IF NOT EXISTS TelemetryLogs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  uuid TEXT NOT NULL,
+  state TEXT NOT NULL,
+  batteryLevel REAL NOT NULL,
+  lat REAL NOT NULL,
+  lng REAL NOT NULL,
+  pm25 REAL NOT NULL,
+  co2 REAL NOT NULL,
+  no2 REAL NOT NULL,
+  temperature REAL NOT NULL,
+  humidity REAL NOT NULL,
+  rssi INTEGER NOT NULL,
+  client_timestamp TEXT NOT NULL,
+  server_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS AlertConfig (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  pm25_threshold REAL NOT NULL DEFAULT 140,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT OR IGNORE INTO AlertConfig (id, pm25_threshold) VALUES (1, 140);
