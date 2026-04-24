@@ -20,7 +20,7 @@ Dependencies flow left → right in this diagram. Work in parallel **within a co
 Phase 1 (unblock)       Phase 2 (build in parallel)         Phase 3 (polish)
 ─────────────────       ───────────────────────             ────────────────
 
-#1 Haithem  ──────▶     #2 Hamza     (auth, alerts)
+#1 Hamza  ──────▶     #2 Haithem     (auth, alerts)
   (contracts)           #3 Abderraouf (analytics)
                         #4 Oussama   (shell, map)   ──▶    cross-cutting:
                                                            #5 Imad (reports, i18n)
