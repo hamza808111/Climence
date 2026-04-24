@@ -1,4 +1,4 @@
-# Student 2 — Hamza
+# Student 2 — Haithem
 ## Role: Backend · Auth, Roles, Alerts
 
 You own **who can do what** and **when to shout**. Every protected route enforces your middleware; every alert uses your configurable threshold. Two planned items in the traceability matrix are yours to push from Partial → Implemented: UC-A6 lockout policy (FR-02) and deeper module-level RBAC (FR-03).
@@ -17,7 +17,7 @@ You own **who can do what** and **when to shout**. Every protected route enforce
 - [backend/src/features/alerts/](../../backend/src/features/alerts/) — whole folder (`config.ts`, validators, lifecycle)
 - [backend/src/lib/auth.ts](../../backend/src/lib/auth.ts) — `requireAuth`, `requireRole`
 - [shared/src/auth.ts](../../shared/src/auth.ts) — `UserRole`, `LoginRequest`, `LoginResponse`, `AuthUser`
-- The auth path inside [backend/src/ws.ts](../../backend/src/ws.ts) (token extraction) — edit in coordination with Haithem
+- The auth path inside [backend/src/ws.ts](../../backend/src/ws.ts) (token extraction) — edit in coordination with Hamza
 
 ### Requirements
 
@@ -68,7 +68,7 @@ You own **who can do what** and **when to shout**. Every protected route enforce
 - Analyst token can acknowledge alerts (P3) but not change thresholds.
 - `/api/auth/me` returns `{ user, permissions: {...} }`.
 
-**Dependencies:** Haithem's WS auth hook (already in place — just don't break it).
+**Dependencies:** Hamza's WS auth hook (already in place — just don't break it).
 
 ---
 
@@ -90,7 +90,7 @@ You own **who can do what** and **when to shout**. Every protected route enforce
 - Dashboard's banner/feed (Imad's responsibility) reflects the new shape.
 - Migration-safe: existing DBs upgrade cleanly (add column defaults).
 
-**Dependencies:** Haithem (coordinate on snapshot shape + schema migration plan).
+**Dependencies:** Hamza (coordinate on snapshot shape + schema migration plan).
 
 ---
 

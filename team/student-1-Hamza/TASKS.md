@@ -1,4 +1,4 @@
-# Student 1 — Haithem
+# Student 1 — Hamza
 ## Role: Team Lead · Platform & Telemetry Pipeline
 
 You own the **plumbing that everyone else stands on**: the shared type contract, the drone simulator, the ingestion + WebSocket path, and the SQLite schema. If the snapshot shape changes, the whole app changes; that's why this slice is yours first.

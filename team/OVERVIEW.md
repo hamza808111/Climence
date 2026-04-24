@@ -30,8 +30,8 @@ Phase 1 (unblock)       Phase 2 (build in parallel)         Phase 3 (polish)
 
 **Start order**
 
-1. **Haithem (Day 1-2)**: lock down the snapshot contract in `shared/src/messages.ts` and any schema changes in `backend/src/db/schema.sql`. Publish a PR so everyone unblocks.
-2. **Hamza + Abderraouf + Oussama (Day 3+)**: begin in parallel. Hamza's auth middleware is a prerequisite for Abderraouf's new protected routes — sequence the middleware PR first, then backfill tests.
+1. **Hamza (Day 1-2)**: lock down the snapshot contract in `shared/src/messages.ts` and any schema changes in `backend/src/db/schema.sql`. Publish a PR so everyone unblocks.
+2. **Haithem + Abderraouf + Oussama (Day 3+)**: begin in parallel. Haithem's auth middleware is a prerequisite for Abderraouf's new protected routes — sequence the middleware PR first, then backfill tests.
 3. **Imad (Day 4+)**: depends on Oussama's shell scaffold to mount the ReportModal and i18n wiring. Can start the i18n dictionary and report exporters in isolation on Day 3.
 
 ## Shared conventions
@@ -40,8 +40,8 @@ Phase 1 (unblock)       Phase 2 (build in parallel)         Phase 3 (polish)
 
 - `main` is protected. No direct commits.
 - Feature branches: `<student>/<slice>-<short-desc>`
-  - `haithem/platform-snapshot-retention`
-  - `hamza/auth-lockout-policy`
+  - `hamza/platform-snapshot-retention`
+  - `haithem/auth-lockout-policy`
   - `abderraouf/analytics-forecast-service`
   - `oussama/frontend-map-drill-down`
   - `imad/reports-excel-exporter`
@@ -82,8 +82,8 @@ A task is done when all of the following are true:
 ### Review policy
 
 - Every PR gets at least one review — ideally from the student whose slice is nearest. Cross-slice reviewers watch for:
-  - Snapshot shape changes (Haithem reviews)
-  - Auth + RBAC changes (Hamza reviews)
+  - Snapshot shape changes (Hamza reviews)
+  - Auth + RBAC changes (Haithem reviews)
   - SQL + query plan changes (Abderraouf reviews)
   - App shell or render path changes (Oussama reviews)
   - Anything touching translations, a11y, or reports (Imad reviews)
