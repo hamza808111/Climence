@@ -33,6 +33,13 @@ You own **everything the user sees first**: the app shell, the KPI strip, the Ri
 
 ## Prioritized tasks
 
+> ✅ **DONE — 2026-04-25.**
+> Branch: `oussama/frontend-map-drill-down`.
+> Files changed: [frontend/src/components/map/RiyadhGoogleMap.tsx](../../frontend/src/components/map/RiyadhGoogleMap.tsx), [frontend/src/App.tsx](../../frontend/src/App.tsx), [package-lock.json](../../package-lock.json).
+> Tests: **27/27 green** (`npm run test --silent`), plus frontend type/lint green (`npm run typecheck -w @climence/dashboard --silent`, `npm run lint -w @climence/dashboard --silent`).
+> Requirement IDs moved: **FR-05 (Partial → Implemented)**; **UC1** strengthened through viewport-aware live map drill-down behavior.
+> Heads-up: hotspot circles already accept `radiusKm` and currently fallback to 500m until backend cluster payload lands.
+
 ### P0 — Proper map drill-down (FR-05)
 
 **Files:** [frontend/src/components/map/RiyadhGoogleMap.tsx](../../frontend/src/components/map/RiyadhGoogleMap.tsx), [frontend/src/App.tsx](../../frontend/src/App.tsx)

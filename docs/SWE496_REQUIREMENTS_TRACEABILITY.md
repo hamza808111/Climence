@@ -14,7 +14,7 @@ Status scale:
 | FR-02 | Secure login with ministry credentials | 6.1.B | Implemented | `backend/src/routes/auth.ts`, `frontend/src/App.tsx` login flow, `backend/src/features/auth/lockout.ts` (5 fails / 10 min → 15 min lock per UC-A6) |
 | FR-03 | Role-based access (admin/analyst/viewer) | 6.1.B | Partial | Auth roles enforced for protected APIs and admin alert settings; broader module-level RBAC still expanding |
 | FR-04 | Real-time pollution map | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` |
-| FR-05 | Zoom/pan between regions/cities/zones | 6.1.C | Partial | Google map zoom/pan implemented; region flow incomplete |
+| FR-05 | Zoom/pan between regions/cities/zones | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` (city/sector/zone presets, fly-to, live viewport/zoom callbacks), `frontend/src/App.tsx` (bounds-aware KPI/viewing panels + hotspot fly-to wiring) |
 | FR-06 | Pollutant switching (CO2/NO2/PM2.5/O3...) | 6.1.C | Partial | UI switching in `frontend/src/App.tsx` |
 | FR-07 | Display AQI by region | 6.1.C | Partial | Sensor/city AQI implemented; regional aggregation incomplete |
 | FR-08 | Filter data by time, pollutant, location | 6.1.C + UC-A1 | Partial | Time and pollutant filters implemented; location filter incomplete |
@@ -98,3 +98,11 @@ Delivered requirement slice:
 - FR-01 realism hardening: restored hazard-driven swarm behavior in the simulator (`FleetManager` polls `/api/alerts/active`, clusters hazards, dispatches up to 3 nearest drones).
 - FR-01 data channel hardening: added `INVESTIGATING_HAZARD` state to shared telemetry contract and expanded deterministic environment map to 5 hotspots.
 - NFR-01 partial hardening: added simulator tests for investigation transition and hotspot pollution burn-down (`simulator/src/device/DroneDevice.test.ts`).
+
+## Iteration (2026-04-25 — Oussama · map drill-down)
+
+Delivered requirement slice:
+
+- FR-05: implemented map drill-down controls (`City` / `Sector` / `Zone`), hotspot fly-to at zoom 14, and live zoom display wiring (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/App.tsx`).
+- UC1: strengthened real-time map exploration by propagating map bounds to the shell and applying viewport-aware sensor counts in KPI and map viewing panels (`frontend/src/App.tsx`).
+- FR-10 UI compatibility hardening: hotspot circles now consume `radiusKm` when present with safe fallback radius to preserve rendering across backend payload versions (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/App.tsx`).

@@ -2,6 +2,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { RIYADH_CENTER, type AqiBandKey } from '@climence/shared';
 
 export type RiyadhMapMode = 'hardware' | 'heatmap';
+export type RiyadhZoomPreset = 'city' | 'sector' | 'zone';
+
+export interface RiyadhMapBounds {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+}
+
+export interface RiyadhMapHotspot {
+  id: string;
+  lat: number;
+  lng: number;
+  aqi: number;
+  band: AqiBandKey;
+  radiusKm?: number;
+}
 
 export interface RiyadhMapSensor {
   uuid: string;
@@ -18,14 +35,38 @@ interface Props {
   apiKey?: string;
   mode: RiyadhMapMode;
   sensors: RiyadhMapSensor[];
+  hotspots?: RiyadhMapHotspot[];
+  zoomPreset?: RiyadhZoomPreset;
+  focusTarget?: { lat: number; lng: number; zoom?: number; nonce: number } | null;
+  onViewportChange?: (viewport: { bounds: RiyadhMapBounds; zoom: number }) => void;
   onPickSensor: (sensor: RiyadhMapSensor) => void;
 }
 
-type GoogleMapInstance = object;
+interface GoogleLatLng {
+  lat: () => number;
+  lng: () => number;
+}
+
+interface GoogleLatLngBounds {
+  getNorthEast: () => GoogleLatLng;
+  getSouthWest: () => GoogleLatLng;
+}
+
+interface GoogleMapsListener {
+  remove: () => void;
+}
+
+interface GoogleMapInstance {
+  setZoom: (zoom: number) => void;
+  getZoom: () => number | undefined;
+  panTo: (location: { lat: number; lng: number }) => void;
+  getBounds: () => GoogleLatLngBounds | undefined;
+  addListener: (eventName: 'idle', handler: () => void) => GoogleMapsListener;
+}
 
 interface GoogleMarkerInstance {
   setMap: (map: GoogleMapInstance | null) => void;
-  addListener: (eventName: 'click', handler: () => void) => void;
+  addListener: (eventName: 'click', handler: () => void) => GoogleMapsListener;
 }
 
 interface GoogleCircleInstance {
@@ -159,11 +200,22 @@ function loadGoogleMaps(apiKey: string) {
   return window.__climenceGoogleMapsLoader;
 }
 
-export function RiyadhGoogleMap({ apiKey, mode, sensors, onPickSensor }: Props) {
+export function RiyadhGoogleMap({
+  apiKey,
+  mode,
+  sensors,
+  hotspots = [],
+  zoomPreset = 'city',
+  focusTarget = null,
+  onViewportChange,
+  onPickSensor,
+}: Props) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<GoogleMapInstance | null>(null);
+  const viewportListenerRef = useRef<GoogleMapsListener | null>(null);
   const markersRef = useRef<GoogleMarkerInstance[]>([]);
-  const circlesRef = useRef<GoogleCircleInstance[]>([]);
+  const heatCirclesRef = useRef<GoogleCircleInstance[]>([]);
+  const hotspotCirclesRef = useRef<GoogleCircleInstance[]>([]);
   const infoWindowRef = useRef<GoogleInfoWindowInstance | null>(null);
   const [scriptError, setScriptError] = useState<string | null>(null);
   const loadError =
@@ -200,6 +252,34 @@ export function RiyadhGoogleMap({ apiKey, mode, sensors, onPickSensor }: Props) 
         if (!infoWindowRef.current) {
           infoWindowRef.current = new window.google.maps.InfoWindow();
         }
+
+        viewportListenerRef.current?.remove();
+        viewportListenerRef.current = null;
+
+        if (onViewportChange && mapRef.current) {
+          const emitViewport = () => {
+            const map = mapRef.current;
+            if (!map) return;
+            const zoom = map.getZoom();
+            const bounds = map.getBounds();
+            if (typeof zoom !== 'number' || !bounds) return;
+
+            const ne = bounds.getNorthEast();
+            const sw = bounds.getSouthWest();
+            onViewportChange({
+              zoom,
+              bounds: {
+                north: ne.lat(),
+                east: ne.lng(),
+                south: sw.lat(),
+                west: sw.lng(),
+              },
+            });
+          };
+
+          viewportListenerRef.current = mapRef.current.addListener('idle', emitViewport);
+          emitViewport();
+        }
       })
       .catch(err => {
         if (!cancelled) {
@@ -210,13 +290,17 @@ export function RiyadhGoogleMap({ apiKey, mode, sensors, onPickSensor }: Props) 
     return () => {
       cancelled = true;
     };
-  }, [apiKey]);
+  }, [apiKey, onViewportChange]);
+
+  useEffect(() => {
+    return () => {
+      viewportListenerRef.current?.remove();
+      viewportListenerRef.current = null;
+    };
+  }, []);
 
   const sortedSensors = useMemo(
-    () =>
-      [...sensors].sort(
-        (a, b) => (b.aqi - aqiFallback(b)) - (a.aqi - aqiFallback(a)),
-      ),
+    () => [...sensors].sort((a, b) => (b.aqi - aqiFallback(b)) - (a.aqi - aqiFallback(a))),
     [sensors],
   );
 
@@ -225,9 +309,11 @@ export function RiyadhGoogleMap({ apiKey, mode, sensors, onPickSensor }: Props) 
     const activeMap = mapRef.current;
 
     markersRef.current.forEach(marker => marker.setMap(null));
-    circlesRef.current.forEach(circle => circle.setMap(null));
+    heatCirclesRef.current.forEach(circle => circle.setMap(null));
+    hotspotCirclesRef.current.forEach(circle => circle.setMap(null));
     markersRef.current = [];
-    circlesRef.current = [];
+    heatCirclesRef.current = [];
+    hotspotCirclesRef.current = [];
 
     for (const sensor of sortedSensors) {
       const color = BAND_COLOR[sensor.band];
@@ -272,10 +358,42 @@ export function RiyadhGoogleMap({ apiKey, mode, sensors, onPickSensor }: Props) 
           strokeOpacity: 0.36,
           strokeWeight: 1,
         });
-        circlesRef.current.push(circle);
+        heatCirclesRef.current.push(circle);
       }
     }
-  }, [mode, onPickSensor, sortedSensors]);
+
+    for (const hotspot of hotspots) {
+      const hotspotColor = BAND_COLOR[hotspot.band];
+      const hotspotRadiusMeters = Math.max(500, (hotspot.radiusKm ?? 0.5) * 1000);
+      const hotspotCircle = new window.google.maps.Circle({
+        map: activeMap,
+        center: { lat: hotspot.lat, lng: hotspot.lng },
+        radius: hotspotRadiusMeters,
+        fillColor: hotspotColor,
+        fillOpacity: 0.08,
+        strokeColor: hotspotColor,
+        strokeOpacity: 0.46,
+        strokeWeight: 1.2,
+      });
+      hotspotCirclesRef.current.push(hotspotCircle);
+    }
+  }, [hotspots, mode, onPickSensor, sortedSensors]);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const targetZoom: Record<RiyadhZoomPreset, number> = {
+      city: 11,
+      sector: 12.5,
+      zone: 14,
+    };
+    mapRef.current.setZoom(targetZoom[zoomPreset]);
+  }, [zoomPreset]);
+
+  useEffect(() => {
+    if (!mapRef.current || !focusTarget) return;
+    mapRef.current.panTo({ lat: focusTarget.lat, lng: focusTarget.lng });
+    mapRef.current.setZoom(focusTarget.zoom ?? 14);
+  }, [focusTarget]);
 
   return (
     <div className="map">

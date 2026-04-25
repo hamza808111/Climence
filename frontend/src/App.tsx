@@ -19,9 +19,6 @@ import {
   Layers,
   Map as MapIcon,
   MapPin,
-  Maximize,
-  Minus,
-  Plus,
   Radio,
   Search,
   Settings,
@@ -44,7 +41,13 @@ import {
   type TelemetryRecord,
 } from '@climence/shared';
 import { fetchAlertConfig, fetchHistory, login, updateAlertConfig } from './api/client';
-import { RiyadhGoogleMap, type RiyadhMapSensor } from './components/map/RiyadhGoogleMap';
+import {
+  RiyadhGoogleMap,
+  type RiyadhMapBounds,
+  type RiyadhMapHotspot,
+  type RiyadhMapSensor,
+  type RiyadhZoomPreset,
+} from './components/map/RiyadhGoogleMap';
 import { ReportModal } from './components/ReportModal';
 import { useLiveTelemetry, type ConnectionStatus } from './hooks/useLiveTelemetry';
 import { computeDriftVector, computeForecast, computeSourceAttribution, detectTrend } from './lib/analytics';
@@ -96,6 +99,7 @@ interface HotspotCard {
   trend: number;
   pollutant: string;
   sourceUuid?: string;
+  radiusKm?: number;
 }
 
 interface PollutantStat {
@@ -242,11 +246,26 @@ function nearestSensorUuid(lat: number, lng: number, sensors: SensorPoint[]) {
   return closest.uuid;
 }
 
+function isSensorInBounds(sensor: SensorPoint, bounds: RiyadhMapBounds) {
+  const inLat = sensor.lat >= bounds.south && sensor.lat <= bounds.north;
+  const inLng =
+    bounds.west <= bounds.east
+      ? sensor.lng >= bounds.west && sensor.lng <= bounds.east
+      : sensor.lng >= bounds.west || sensor.lng <= bounds.east;
+  return inLat && inLng;
+}
+
 function hotspotsFromApi(hotspots: Hotspot[], sensors: SensorPoint[]): HotspotCard[] {
   return hotspots.map((hotspot, index) => {
     const aqi = pm25ToAqi(hotspot.avg_pm25);
     const band = aqiBandFor(aqi).key;
     const trend = Math.round(((index % 3) - 1) * (4 + index * 2));
+    const hotspotWithRadius = hotspot as Hotspot & { radius_km?: number; radiusKm?: number };
+    const radiusCandidate = hotspotWithRadius.radiusKm ?? hotspotWithRadius.radius_km;
+    const radiusKm =
+      typeof radiusCandidate === 'number' && Number.isFinite(radiusCandidate) && radiusCandidate > 0
+        ? radiusCandidate
+        : undefined;
 
     return {
       id: `API-${index + 1}`,
@@ -259,6 +278,7 @@ function hotspotsFromApi(hotspots: Hotspot[], sensors: SensorPoint[]): HotspotCa
       trend,
       pollutant: 'PM2.5',
       sourceUuid: nearestSensorUuid(hotspot.lat_zone, hotspot.lng_zone, sensors),
+      radiusKm,
     };
   });
 }
@@ -515,6 +535,10 @@ export default function App() {
   const [selected, setSelected] = useState<HotspotCard | null>(null);
   const [rtl, setRtl] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [mapBounds, setMapBounds] = useState<RiyadhMapBounds | null>(null);
+  const [mapZoom, setMapZoom] = useState(11);
+  const [zoomPreset, setZoomPreset] = useState<RiyadhZoomPreset>('city');
+  const [mapFocusTarget, setMapFocusTarget] = useState<{ lat: number; lng: number; zoom?: number; nonce: number } | null>(null);
   const locale: Locale = rtl ? 'ar' : 'en';
   const t = useCallback((key: DictKey) => translate(key, locale), [locale]);
   const [historySeries, setHistorySeries] = useState<number[]>([]);
@@ -561,6 +585,16 @@ export default function App() {
     [sensors],
   );
 
+  const sensorsInView = useMemo(
+    () => (mapBounds ? sensors.filter(sensor => isSensorInBounds(sensor, mapBounds)) : sensors),
+    [mapBounds, sensors],
+  );
+
+  const onlineSensorsInView = useMemo(
+    () => sensorsInView.filter(sensor => sensor.status === 'online').length,
+    [sensorsInView],
+  );
+
   const hotspots = useMemo(() => {
     if (snapshot.hotspots.length > 0) {
       const fromApi = hotspotsFromApi(snapshot.hotspots, sensors);
@@ -574,6 +608,18 @@ export default function App() {
     if (!selected) return null;
     return hotspots.find(hotspot => hotspot.id === selected.id) ?? null;
   }, [hotspots, selected]);
+
+  const mapHotspots = useMemo<RiyadhMapHotspot[]>(
+    () => hotspots.map(hotspot => ({
+      id: hotspot.id,
+      lat: hotspot.lat,
+      lng: hotspot.lng,
+      aqi: hotspot.aqi,
+      band: hotspot.band,
+      radiusKm: hotspot.radiusKm,
+    })),
+    [hotspots],
+  );
 
   useEffect(() => {
     if (!selectedHotspot) {
@@ -784,6 +830,17 @@ export default function App() {
       sourceUuid: sensor.uuid,
     });
   }, [sensors]);
+
+  const handleMapViewportChange = useCallback((viewport: { bounds: RiyadhMapBounds; zoom: number }) => {
+    setMapBounds(viewport.bounds);
+    setMapZoom(viewport.zoom);
+  }, []);
+
+  const handlePickHotspot = useCallback((hotspot: HotspotCard) => {
+    setSelected(hotspot);
+    setZoomPreset('zone');
+    setMapFocusTarget({ lat: hotspot.lat, lng: hotspot.lng, zoom: 14, nonce: Date.now() });
+  }, []);
 
   const handleSaveAlertThreshold = useCallback(() => {
     if (!authToken) {
@@ -1120,15 +1177,19 @@ export default function App() {
             </div>
             <div className="kpi-row">
               <div className="kpi-value">
-                {onlineSensors}
-                <span style={{ color: 'var(--ink-3)', fontSize: 22 }}>/{sensors.length}</span>
+                {onlineSensorsInView}
+                <span style={{ color: 'var(--ink-3)', fontSize: 22 }}>/{sensorsInView.length}</span>
               </div>
               <span className="kpi-delta down">
                 <ArrowDown size={11} strokeWidth={2.5} />
-                {Math.max(0, sensors.length - onlineSensors)} offline
+                {Math.max(0, sensorsInView.length - onlineSensorsInView)} offline
               </span>
             </div>
-            <div className="kpi-meta">Realtime stream · {statusMeta.label.toLowerCase()}</div>
+            <div className="kpi-meta">
+              {mapBounds
+                ? `Viewport filter active · ${statusMeta.label.toLowerCase()}`
+                : `Realtime stream · ${statusMeta.label.toLowerCase()}`}
+            </div>
           </div>
 
           <div className="kpi">
@@ -1156,6 +1217,10 @@ export default function App() {
             apiKey={googleMapsApiKey}
             mode={mode}
             sensors={sensors}
+            hotspots={mapHotspots}
+            zoomPreset={zoomPreset}
+            focusTarget={mapFocusTarget}
+            onViewportChange={handleMapViewportChange}
             onPickSensor={handlePickSensor}
           />
 
@@ -1176,18 +1241,14 @@ export default function App() {
 
           <div className="map-panel-tr glass">
             <div className="map-tools">
-              <button className="map-tool" title="Zoom in">
-                <Plus size={14} />
+              <button className={`map-tool ${zoomPreset === 'city' ? 'active' : ''}`} title="City view" onClick={() => setZoomPreset('city')}>
+                City
               </button>
-              <button className="map-tool" title="Zoom out">
-                <Minus size={14} />
+              <button className={`map-tool ${zoomPreset === 'sector' ? 'active' : ''}`} title="Sector view" onClick={() => setZoomPreset('sector')}>
+                Sector
               </button>
-              <div className="map-tool-sep" />
-              <button className="map-tool active" title="Layers">
-                <Layers size={14} />
-              </button>
-              <button className="map-tool" title="Fullscreen">
-                <Maximize size={14} />
+              <button className={`map-tool ${zoomPreset === 'zone' ? 'active' : ''}`} title="Zone view" onClick={() => setZoomPreset('zone')}>
+                Zone
               </button>
             </div>
           </div>
@@ -1227,13 +1288,13 @@ export default function App() {
               <div>
                 <div className="eyebrow">Viewing</div>
                 <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, color: 'var(--ink-0)', letterSpacing: '-0.01em' }}>
-                  {sensors.length} sensors
+                  {sensorsInView.length} sensors in current bounds
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
                 <div className="eyebrow">Zoom</div>
                 <div className="mono tnum" style={{ fontSize: 13, color: 'var(--ink-1)' }}>
-                  11.4
+                  {mapZoom.toFixed(1)}
                 </div>
               </div>
             </div>
@@ -1241,11 +1302,11 @@ export default function App() {
             <div className="row-between" style={{ fontSize: 11.5 }}>
               <span className="row-flex gap-tight">
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ok)' }} />
-                {onlineSensors} online
+                {onlineSensorsInView} online
               </span>
               <span className="row-flex gap-tight">
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ink-3)', opacity: 0.6 }} />
-                {Math.max(0, sensors.length - onlineSensors)} offline
+                {Math.max(0, sensorsInView.length - onlineSensorsInView)} offline
               </span>
             </div>
           </div>
@@ -1408,7 +1469,7 @@ export default function App() {
               <li
                 key={hotspot.id}
                 className={`hotspot ${selectedHotspot?.id === hotspot.id ? 'selected' : ''}`}
-                onClick={() => setSelected(hotspot)}
+                onClick={() => handlePickHotspot(hotspot)}
               >
                 <div className="hotspot-rank">#{String(index + 1).padStart(2, '0')}</div>
                 <div>
