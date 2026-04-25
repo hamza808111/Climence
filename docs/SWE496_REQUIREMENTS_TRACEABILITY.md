@@ -38,7 +38,7 @@ Status scale:
 | NFR-04 | Backups and recovery | 6.2.C | Planned | No backup automation yet |
 | NFR-05 | Authentication required | 6.2.D | Partial | Auth required for user-facing API routes + WebSocket; ingestion POST remains device channel |
 | NFR-06 | Encrypt data at rest/in transit | 6.2.D | Planned | TLS/encryption controls pending |
-| NFR-07 | Desktop/tablet/mobile support | 6.2.E | Partial | Responsive dashboard CSS implemented |
+| NFR-07 | Desktop/tablet/mobile support | 6.2.E | Implemented | Shell extracted + responsive breakpoints at ≤1280/≤1024/≤640px. Hamburger nav, bottom-sheet side rail, RTL-aware. iPad 1024×768 verified. |
 | NFR-08 | Arabic/English interface | 6.2.E | Partial | Nav/KPIs/panels/banner/report modal translate via `frontend/src/lib/i18n.ts`; deeper labels and validation messages still English |
 | NFR-09 | Intuitive interface | 6.2.E | Partial | Redesigned dashboard complete; usability validation pending |
 | NFR-10 | Admin logging/error monitoring | 6.2.F | Partial | API logs/errors exist; centralized observability pending |

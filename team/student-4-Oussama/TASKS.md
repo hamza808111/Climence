@@ -114,7 +114,7 @@ You own **everything the user sees first**: the app shell, the KPI strip, the Ri
 
 ### P3 — Responsive shell + layout perf (NFR-07)
 
-**Files:** [frontend/src/index.css](../../frontend/src/index.css), [frontend/src/App.tsx](../../frontend/src/App.tsx)
+**Files:** [frontend/src/index.css](../../frontend/src/index.css), [frontend/src/App.tsx](../../frontend/src/App.tsx), [frontend/src/components/AuthScreen.tsx](../../frontend/src/components/AuthScreen.tsx), [frontend/src/components/Shell.tsx](../../frontend/src/components/Shell.tsx), [frontend/src/components/Dashboard.tsx](../../frontend/src/components/Dashboard.tsx), [frontend/src/hooks/useDashboardData.ts](../../frontend/src/hooks/useDashboardData.ts)
 
 **What to do:**
 - Coordinate with Imad — he owns the deep responsive rules and a11y. Your job is the **shell skeleton**:
@@ -128,6 +128,13 @@ You own **everything the user sees first**: the app shell, the KPI strip, the Ri
 - `App.tsx` shrinks to ≤ 300 lines and is purely composition.
 
 **Dependencies:** none (Imad's polish can layer on).
+
+> **DONE** — 2026-04-25
+>
+> - Split App.tsx (1786 → 118 lines) into: `AuthScreen.tsx`, `Shell.tsx`, `Dashboard.tsx`, `useDashboardData.ts`.
+> - ≤1280px: side rail narrows to 320px. ≤1024px: nav becomes slide-out drawer with hamburger + backdrop overlay. ≤640px: side rail → bottom-sheet with drag handle.
+> - All breakpoints RTL-aware. iPad 1024×768: map + side rail visible, no horizontal scrollbars.
+> - Typecheck ✅ · Lint ✅ · 23/23 tests ✅ · Build ✅ (840ms).
 
 ---
 
