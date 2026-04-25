@@ -89,6 +89,11 @@ export interface TrendSignal {
 export interface ForecastPoint {
   hourIso: string;
   aqi: number;
+  pm25: number;
+  pm10: number;
+  co2: number;
+  no2: number;
+  dust: number;
   band: string; // AqiBandKey
   confidence: number; // 0-1
 }

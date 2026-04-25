@@ -35,16 +35,17 @@ import {
   AQI_BANDS,
   DroneState,
   PM25_ALERT_THRESHOLD,
-  RIYADH_BOUNDS,
   UserRole,
   aqiBandFor,
   pm25ToAqi,
   type AuthUser,
   type Hotspot,
   type TelemetryRecord,
+  type TrendSignal,
 } from '@climence/shared';
-import { fetchAlertConfig, fetchHistory, login, updateAlertConfig } from './api/client';
-import { RiyadhGoogleMap, type RiyadhMapSensor } from './components/map/RiyadhGoogleMap';
+import { fetchAlertConfig, fetchHistory, fetchHistoryByZone, login, updateAlertConfig } from './api/client';
+import { RiyadhLeafletMap, type LeafletMapSensor } from './components/map/RiyadhLeafletMap';
+import { AnalyticsView } from './components/panels/AnalyticsView';
 import { ReportModal } from './components/ReportModal';
 import { useLiveTelemetry, type ConnectionStatus } from './hooks/useLiveTelemetry';
 import { computeDriftVector, computeForecast, computeSourceAttribution, detectTrend } from './lib/analytics';
@@ -58,32 +59,12 @@ import {
 } from './lib/auth-session';
 import climenceLogo from './assets/climence-logo.png';
 
-type ViewMode = 'hardware' | 'heatmap';
+type ViewMode = 'hardware' | 'heatmap' | 'normal';
 type TimeRange = '1h' | '24h' | '7d' | '30d';
 type PollutantKey = 'pm25' | 'co2' | 'no2' | 'temperature' | 'humidity' | 'battery';
 type AqiBandKey = (typeof AQI_BANDS)[number]['key'];
 type AlertSeverity = 'crit' | 'warn' | 'info' | 'ok';
 
-interface SensorPoint {
-  id: string;
-  label: string;
-  uuid: string;
-  x: number;
-  y: number;
-  lat: number;
-  lng: number;
-  aqi: number;
-  band: AqiBandKey;
-  pm25: number;
-  co2: number;
-  no2: number;
-  temperature: number;
-  humidity: number;
-  battery: number;
-  rssi: number;
-  status: 'online' | 'offline';
-  serverTimestamp: string;
-}
 
 interface HotspotCard {
   id: string;
@@ -198,19 +179,13 @@ function makePath(data: number[], width: number, height: number, padding: { l: n
     .join(' ');
 }
 
-function toSensorPoint(drone: TelemetryRecord, index: number): SensorPoint {
-  const latSpan = RIYADH_BOUNDS.maxLat - RIYADH_BOUNDS.minLat;
-  const lngSpan = RIYADH_BOUNDS.maxLng - RIYADH_BOUNDS.minLng;
-  const x = clamp((drone.lng - RIYADH_BOUNDS.minLng) / lngSpan, 0.06, 0.94);
-  const y = clamp(1 - (drone.lat - RIYADH_BOUNDS.minLat) / latSpan, 0.08, 0.92);
+function toSensorPoint(drone: TelemetryRecord, index: number): LeafletMapSensor {
   const aqi = pm25ToAqi(drone.pm25);
   const band = aqiBandFor(aqi).key;
   return {
     id: `S-${String(index + 1).padStart(3, '0')}`,
     label: `Sensor ${drone.uuid.slice(-4).toUpperCase()}`,
     uuid: drone.uuid,
-    x,
-    y,
     lat: drone.lat,
     lng: drone.lng,
     aqi,
@@ -221,13 +196,11 @@ function toSensorPoint(drone: TelemetryRecord, index: number): SensorPoint {
     temperature: drone.temperature,
     humidity: drone.humidity,
     battery: drone.batteryLevel,
-    rssi: drone.rssi,
     status: drone.state === DroneState.OFFLINE ? 'offline' : 'online',
-    serverTimestamp: drone.server_timestamp,
   };
 }
 
-function nearestSensorUuid(lat: number, lng: number, sensors: SensorPoint[]) {
+function nearestSensorUuid(lat: number, lng: number, sensors: LeafletMapSensor[]) {
   if (sensors.length === 0) return undefined;
   let closest = sensors[0];
   let best = Number.POSITIVE_INFINITY;
@@ -242,7 +215,7 @@ function nearestSensorUuid(lat: number, lng: number, sensors: SensorPoint[]) {
   return closest.uuid;
 }
 
-function hotspotsFromApi(hotspots: Hotspot[], sensors: SensorPoint[]): HotspotCard[] {
+function hotspotsFromApi(hotspots: Hotspot[], sensors: LeafletMapSensor[]): HotspotCard[] {
   return hotspots.map((hotspot, index) => {
     const aqi = pm25ToAqi(hotspot.avg_pm25);
     const band = aqiBandFor(aqi).key;
@@ -263,7 +236,29 @@ function hotspotsFromApi(hotspots: Hotspot[], sensors: SensorPoint[]): HotspotCa
   });
 }
 
-function hotspotsFromSensors(sensors: SensorPoint[]): HotspotCard[] {
+import type { HotspotCluster } from '@climence/shared';
+function hotspotsFromClusters(clusters: HotspotCluster[], sensors: LeafletMapSensor[]): HotspotCard[] {
+  return clusters.map((cluster, index) => {
+    const aqi = pm25ToAqi(cluster.peakPm25);
+    const band = aqiBandFor(aqi).key;
+    const trend = Math.round(((index % 3) - 1) * (4 + index * 2));
+
+    return {
+      id: `CLS-${index + 1}`,
+      name: `Cluster ${cluster.centroidLat.toFixed(2)} · ${cluster.centroidLng.toFixed(2)}`,
+      coord: formatCoord(cluster.centroidLat, cluster.centroidLng),
+      lat: cluster.centroidLat,
+      lng: cluster.centroidLng,
+      aqi,
+      band,
+      trend,
+      pollutant: 'PM2.5',
+      sourceUuid: nearestSensorUuid(cluster.centroidLat, cluster.centroidLng, sensors),
+    };
+  });
+}
+
+function hotspotsFromSensors(sensors: LeafletMapSensor[]): HotspotCard[] {
   return sensors.slice(0, 7).map((sensor, index) => ({
     id: `SNS-${index + 1}`,
     name: sensor.label,
@@ -515,6 +510,7 @@ export default function App() {
   const [selected, setSelected] = useState<HotspotCard | null>(null);
   const [rtl, setRtl] = useState(false);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [currentTab, setCurrentTab] = useState<'overview' | 'analytics' | 'map'>('overview');
   const locale: Locale = rtl ? 'ar' : 'en';
   const t = useCallback((key: DictKey) => translate(key, locale), [locale]);
   const [historySeries, setHistorySeries] = useState<number[]>([]);
@@ -525,7 +521,6 @@ export default function App() {
 
   const { snapshot, status } = useLiveTelemetry(authToken);
   const statusMeta = STATUS_META[status];
-  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   useEffect(() => {
     document.documentElement.setAttribute('dir', rtl ? 'rtl' : 'ltr');
@@ -562,13 +557,18 @@ export default function App() {
   );
 
   const hotspots = useMemo(() => {
+    if (snapshot.hotspotClusters && snapshot.hotspotClusters.length > 0) {
+      const fromClusters = hotspotsFromClusters(snapshot.hotspotClusters, sensors);
+      if (fromClusters.length >= 7) return fromClusters;
+      return [...fromClusters, ...hotspotsFromSensors(sensors)].slice(0, 7);
+    }
     if (snapshot.hotspots.length > 0) {
       const fromApi = hotspotsFromApi(snapshot.hotspots, sensors);
       if (fromApi.length >= 7) return fromApi;
       return [...fromApi, ...hotspotsFromSensors(sensors)].slice(0, 7);
     }
     return hotspotsFromSensors(sensors);
-  }, [snapshot.hotspots, sensors]);
+  }, [snapshot.hotspotClusters, snapshot.hotspots, sensors]);
 
   const selectedHotspot = useMemo(() => {
     if (!selected) return null;
@@ -615,25 +615,98 @@ export default function App() {
     };
   }, [authToken, selectedHotspot]);
 
+  const [livePm25History, setLivePm25History] = useState<number[]>([]);
+  const [liveNo2History, setLiveNo2History] = useState<number[]>([]);
+  
+  // Fetch real-time city history (P2 endpoint) for the main charts
+  useEffect(() => {
+    if (!authToken) return;
+    let cancelled = false;
+    
+    const fetchAll = () => {
+      Promise.all([
+        fetchHistoryByZone('pm25', range, undefined, undefined, undefined, authToken),
+        fetchHistoryByZone('no2', range, undefined, undefined, undefined, authToken)
+      ]).then(([pm25Data, no2Data]) => {
+        if (!cancelled) {
+          if (pm25Data.length > 0) setLivePm25History(pm25Data.map(p => p.value));
+          if (no2Data.length > 0) setLiveNo2History(no2Data.map(p => p.value));
+        }
+      }).catch(console.error);
+    };
+
+    fetchAll();
+    const interval = setInterval(fetchAll, 15000);
+      
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [authToken, range]);
+
   const basePm25Series = useMemo(() => {
+    if (livePm25History.length > 1) return livePm25History;
+    
     const raw = snapshot.cityTrend.map(point => point.avg_pm25);
     if (raw.length > 1) return raw;
 
     const fallbackSource = sensors.slice(0, 12).map(sensor => sensor.pm25);
     const baseline = average(fallbackSource) || 85;
     return seededSeries(17, 40, baseline, 24);
-  }, [snapshot.cityTrend, sensors]);
+  }, [snapshot.cityTrend, sensors, livePm25History]);
+
+  const baseNo2Series = useMemo(() => {
+    if (liveNo2History.length > 1) return liveNo2History;
+    const fallback = sensors.slice(0, 12).map(s => s.no2);
+    return seededSeries(17, 10, average(fallback) || 20, 24);
+  }, [sensors, liveNo2History]);
 
   const pm25Series = useMemo(() => {
     return resampleSeries(basePm25Series.map(value => pm25ToAqi(value)), RANGE_POINTS[range]);
   }, [basePm25Series, range]);
 
-  const pm10Series = useMemo(() => pm25Series.map(value => clamp(value * 1.18, 18, 260)), [pm25Series]);
-  const no2Series = useMemo(() => pm25Series.map(value => clamp(value * 0.68 + 22, 8, 180)), [pm25Series]);
+  const no2Series = useMemo(() => resampleSeries(baseNo2Series, RANGE_POINTS[range]), [baseNo2Series, range]);
+  const pm10Series = useMemo(() => pm25Series.map(value => Math.max(18, Math.min(260, value * 1.18))), [pm25Series]);
 
-  const trend = useMemo(() => detectTrend(pm25Series), [pm25Series]);
-  const forecast = useMemo(() => computeForecast(pm25Series, 6), [pm25Series]);
-  const sourcesLive = useMemo(() => computeSourceAttribution(sensors), [sensors]);
+  const trend = useMemo(() => {
+    if (snapshot.trend) return snapshot.trend;
+    const fallback = detectTrend(pm25Series);
+    return {
+      direction: fallback.direction,
+      slope: 0,
+      confidence: 0,
+      windowMinutes: 30
+    } as TrendSignal;
+  }, [snapshot.trend, pm25Series]);
+
+  const forecast = useMemo(() => {
+    if (snapshot.forecast && snapshot.forecast.length > 0) {
+      return snapshot.forecast.map(f => {
+        const d = new Date(f.hourIso);
+        const hrStr = d.getHours().toString().padStart(2, '0') + ':00';
+        return { hr: hrStr, val: Math.round(f.aqi), band: f.band as AqiBandKey };
+      });
+    }
+    return computeForecast(pm25Series, 6);
+  }, [snapshot.forecast, pm25Series]);
+
+  const sourcesLive = useMemo(() => {
+    if (snapshot.sources && snapshot.sources.length > 0) {
+      const srcColors: Record<string, string> = {
+        traffic: 'oklch(0.56 0.09 160)',
+        industry: 'oklch(0.68 0.20 28)',
+        dust: 'oklch(0.72 0.14 95)',
+        other: 'oklch(0.85 0.16 95)',
+      };
+      return snapshot.sources.map(s => ({
+        key: s.key as "other" | "traffic" | "industry" | "dust",
+        name: s.name,
+        pct: s.pct,
+        color: srcColors[s.key] || srcColors.other,
+      }));
+    }
+    return computeSourceAttribution(sensors);
+  }, [snapshot.sources, sensors]);
   const drift = useMemo(
     () => computeDriftVector(sensors.map(s => ({ lat: s.lat, lng: s.lng, pm25: s.pm25 }))),
     [sensors],
@@ -768,7 +841,7 @@ export default function App() {
     selectedHotspot?.sourceUuid && historySourceUuid === selectedHotspot.sourceUuid ? historySeries : [];
   const thresholdExceededBy = Math.max(0, pm25Now - effectiveAlertThreshold);
 
-  const handlePickSensor = useCallback((sensor: RiyadhMapSensor) => {
+  const handlePickSensor = useCallback((sensor: LeafletMapSensor) => {
     const source = sensors.find(item => item.uuid === sensor.uuid);
     const id = source?.id ?? `S-${sensor.uuid.slice(-4).toUpperCase()}`;
     setSelected({
@@ -953,15 +1026,15 @@ export default function App() {
 
         <div className="nav-section">
           <div className="nav-section-title">{t('nav.monitor')}</div>
-          <button className="nav-item active">
+          <button className={`nav-item ${currentTab === 'overview' ? 'active' : ''}`} onClick={() => setCurrentTab('overview')}>
             <Home size={16} />
             {t('nav.overview')}
           </button>
-          <button className="nav-item">
+          <button className={`nav-item ${currentTab === 'map' ? 'active' : ''}`} onClick={() => setCurrentTab('map')}>
             <MapIcon size={16} />
             {t('nav.livemap')}
           </button>
-          <button className="nav-item">
+          <button className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`} onClick={() => setCurrentTab('analytics')}>
             <BarChart3 size={16} />
             {t('nav.analytics')}
           </button>
@@ -1028,6 +1101,9 @@ export default function App() {
         </span>
 
         <div className="seg desktop-only" style={{ marginLeft: 8 }}>
+          <button className={`seg-btn ${mode === 'normal' ? 'active' : ''}`} onClick={() => setMode('normal')}>
+            <MapIcon size={12} /> Normal
+          </button>
           <button className={`seg-btn ${mode === 'hardware' ? 'active' : ''}`} onClick={() => setMode('hardware')}>
             <Grid2x2 size={12} /> {t('seg.hardware')}
           </button>
@@ -1152,12 +1228,16 @@ export default function App() {
         </div>
 
         <div className="stage">
-          <RiyadhGoogleMap
-            apiKey={googleMapsApiKey}
-            mode={mode}
-            sensors={sensors}
-            onPickSensor={handlePickSensor}
-          />
+          {currentTab === 'analytics' ? (
+            <AnalyticsView authToken={authToken} />
+          ) : (
+            <>
+              <RiyadhLeafletMap
+                mode={mode}
+                sensors={sensors}
+                clusters={snapshot.hotspotClusters || []}
+                onPickSensor={handlePickSensor}
+              />
 
           <div className="map-panel-tl">
             <div className="pollutants">
@@ -1268,6 +1348,7 @@ export default function App() {
             pollutantStats={pollutantStats}
             onClose={() => setSelected(null)}
           />
+          </>)}
         </div>
       </main>
 

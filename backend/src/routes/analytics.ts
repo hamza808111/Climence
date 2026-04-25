@@ -143,9 +143,9 @@ router.get('/history', requireAuth, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/analytics/forecast?hours=6|12|24
+// GET /api/analytics/forecast?hours=6|12|24|72|168
 // ---------------------------------------------------------------------------
-const VALID_HOURS = new Set([6, 12, 24]);
+const VALID_HOURS = new Set([6, 12, 24, 72, 168]);
 
 router.get('/forecast', requireAuth, (req, res) => {
   try {

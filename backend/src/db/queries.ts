@@ -207,6 +207,7 @@ const RANGE_MINUTES: Record<string, number> = {
   '24h': 1440,
   '7d':  10080,
   '30d': 43200,
+  '90d': 129600,
 };
 
 const BUCKET_MINUTES: Record<string, number> = {
@@ -214,6 +215,7 @@ const BUCKET_MINUTES: Record<string, number> = {
   '24h': 60,
   '7d':  60,
   '30d': 1440,
+  '90d': 1440,
 };
 
 export interface HistoryPoint {
