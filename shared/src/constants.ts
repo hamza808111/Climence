@@ -16,8 +16,10 @@ export interface PollutionHotspot {
 
 export const ENVIRONMENT_MAP: readonly PollutionHotspot[] = [
   { lat: 24.55, lng: 46.75, peakPm25: 180, peakCo2: 800 }, // Industrial Zone
-  { lat: 24.68, lng: 46.68, peakPm25: 130, peakCo2: 600 }, // High Traffic Intersection
-  { lat: 24.80, lng: 46.60, peakPm25: 110, peakCo2: 550 }, // North Development
+  { lat: 24.68, lng: 46.68, peakPm25: 150, peakCo2: 680 }, // Central Traffic Core
+  { lat: 24.80, lng: 46.60, peakPm25: 120, peakCo2: 560 }, // North Development
+  { lat: 24.72, lng: 46.84, peakPm25: 165, peakCo2: 720 }, // East Logistics Belt
+  { lat: 24.60, lng: 46.58, peakPm25: 140, peakCo2: 620 }, // West Construction Arc
 ];
 
 export const PM25_ALERT_THRESHOLD = 140;

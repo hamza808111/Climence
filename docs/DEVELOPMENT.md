@@ -11,6 +11,16 @@ From repo root:
 - `npm run check`: typecheck + lint + test.
 - `npm run test:integration:api`: API smoke/integration script.
 
+## Simulator Hazard Dispatch Env
+
+`@climence/simulator` supports these optional environment variables for the alert-driven drone dispatch loop:
+
+- `SIMULATOR_AUTH_EMAIL` (default: `analyst@mewa.gov.sa`)
+- `SIMULATOR_AUTH_PASSWORD` (default: `Analyst123!`)
+- `SIMULATOR_AUTH_TOKEN` (optional bearer token override; skips login flow)
+- `SIMULATOR_ALERT_POLL_MS` (default: `10000`)
+- `SIMULATOR_MAX_DRONES_PER_HAZARD` (default: `3`)
+
 ## Fast Search Patterns
 
 Use `rg` for fast navigation.

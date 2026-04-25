@@ -32,6 +32,8 @@ You own the **plumbing that everyone else stands on**: the shared type contract,
 
 ## Prioritized tasks
 
+> ✅ **DONE — 2026-04-25 (partial P3 completion).** Restored the previous-project hazard orchestration behavior in the simulator: [simulator/src/FleetManager.ts](../../simulator/src/FleetManager.ts) now polls active alerts and dispatches up to 3 nearest drones per hazard, while [simulator/src/DroneDevice.ts](../../simulator/src/DroneDevice.ts) now supports `INVESTIGATING_HAZARD` with a 30-second scrubber cycle that reduces hotspot pollution and then returns to patrol mode. Shared contract/environment updates landed in [shared/src/telemetry.ts](../../shared/src/telemetry.ts) and [shared/src/constants.ts](../../shared/src/constants.ts). Added tests in [simulator/src/device/DroneDevice.test.ts](../../simulator/src/device/DroneDevice.test.ts). **Still open in P3:** explicit rush-hour multiplier and POST retry queue/backoff.
+
 ### P0 — Harden the ingestion + broadcast round-trip
 
 **Files:** [backend/src/routes/telemetry.ts](../../backend/src/routes/telemetry.ts), [backend/src/ws.ts](../../backend/src/ws.ts)

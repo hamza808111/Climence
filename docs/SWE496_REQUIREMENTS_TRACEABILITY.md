@@ -10,7 +10,7 @@ Status scale:
 
 | ID | Requirement | Source | Status | Current Evidence |
 | --- | --- | --- | --- | --- |
-| FR-01 | Collect pollution data from IoT, drones, external APIs | 6.1.A | Partial | `simulator/`, `backend/src/routes/telemetry.ts` |
+| FR-01 | Collect pollution data from IoT, drones, external APIs | 6.1.A | Partial | `simulator/src/DroneDevice.ts`, `simulator/src/FleetManager.ts`, `backend/src/routes/telemetry.ts` |
 | FR-02 | Secure login with ministry credentials | 6.1.B | Implemented | `backend/src/routes/auth.ts`, `frontend/src/App.tsx` login flow, `backend/src/features/auth/lockout.ts` (5 fails / 10 min → 15 min lock per UC-A6) |
 | FR-03 | Role-based access (admin/analyst/viewer) | 6.1.B | Partial | Auth roles enforced for protected APIs and admin alert settings; broader module-level RBAC still expanding |
 | FR-04 | Real-time pollution map | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` |
@@ -90,3 +90,11 @@ Delivered requirement slice:
 - FR-02 / UC-A6: login lockout policy — `backend/src/features/auth/lockout.ts` (sliding 10-min window, 15-min lock after 5 failures, 429 response with `Retry-After` header). Six unit tests in `lockout.test.ts` cover threshold, reset-on-success, window expiry, lock expiry, and email-normalization paths.
 - UC-A6: `POST /api/auth/logout` endpoint added (204; placeholder for future server-side token revocation).
 - Shared lockout constants exposed in `shared/src/auth.ts` so the frontend can mirror countdown messaging.
+
+## Iteration (2026-04-25 — Hamza · Simulator hazard loop)
+
+Delivered requirement slice:
+
+- FR-01 realism hardening: restored hazard-driven swarm behavior in the simulator (`FleetManager` polls `/api/alerts/active`, clusters hazards, dispatches up to 3 nearest drones).
+- FR-01 data channel hardening: added `INVESTIGATING_HAZARD` state to shared telemetry contract and expanded deterministic environment map to 5 hotspots.
+- NFR-01 partial hardening: added simulator tests for investigation transition and hotspot pollution burn-down (`simulator/src/device/DroneDevice.test.ts`).
