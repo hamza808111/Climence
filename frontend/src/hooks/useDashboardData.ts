@@ -284,6 +284,7 @@ export function useDashboardData(
   const [mapBounds, setMapBounds] = useState<RiyadhMapBounds | null>(null);
   const [mapZoom, setMapZoom] = useState(11);
   const [zoomPreset, setZoomPreset] = useState<RiyadhZoomPreset>('city');
+  const [currentTab, setCurrentTab] = useState<'overview' | 'analytics'>('overview');
   const [mapFocusTarget, setMapFocusTarget] = useState<{ lat: number; lng: number; zoom?: number; nonce: number } | null>(null);
   const [historySeries, setHistorySeries] = useState<number[]>([]);
   const [historySourceUuid, setHistorySourceUuid] = useState<string | null>(null);
@@ -447,6 +448,7 @@ export function useDashboardData(
 
   return {
     // layout
+    currentTab, setCurrentTab,
     mode, setMode, pollutant, setPollutant, range, setRange,
     // sensors
     sensors, onlineSensors, sensorsInView, onlineSensorsInView,

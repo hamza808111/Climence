@@ -45,6 +45,7 @@ export class FleetManager {
   private cachedHazards: HazardZone[] = [];
   private lastTickMs = Date.now();
   private lastAlertPollMs = 0;
+  private lastBaselinePollMs = 0;
   private tickInFlight = false;
 
   constructor(droneCount: number, endpoint: string) {
@@ -96,6 +97,11 @@ export class FleetManager {
     this.lastTickMs = nowMs;
     DroneDevice.advanceEnvironment(elapsedSec);
 
+    if (nowMs - this.lastBaselinePollMs > 300_000) {
+      this.lastBaselinePollMs = nowMs;
+      void this.fetchRealWorldBaseline();
+    }
+
     try {
       await this.refreshHazardsIfDue(nowMs);
       this.reconcileHazardAssignments();
@@ -130,6 +136,25 @@ export class FleetManager {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`[${new Date().toISOString()}] Failed to fetch active hazards. Error: ${message}`);
+    }
+  }
+
+  private async fetchRealWorldBaseline() {
+    try {
+      const res = await axios.get(
+        'https://air-quality-api.open-meteo.com/v1/air-quality?latitude=24.7136&longitude=46.6753&current=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,dust&timezone=auto',
+        { timeout: 10_000 }
+      );
+      const current = res.data?.current;
+      if (current) {
+        DroneDevice.globalBaseline.pm25 = current.pm2_5 || 10;
+        DroneDevice.globalBaseline.co2 = 400 + ((current.pm2_5 || 10) * 0.5); 
+        DroneDevice.globalBaseline.no2 = current.nitrogen_dioxide || 20;
+        
+        console.log(`[${new Date().toISOString()}] 🌍 Real-world Riyadh AQI baseline synced: PM2.5=${DroneDevice.globalBaseline.pm25.toFixed(1)}, NO2=${DroneDevice.globalBaseline.no2.toFixed(1)}`);
+      }
+    } catch (err) {
+      console.error(`[${new Date().toISOString()}] ⚠️ Failed to fetch live AQI from Open-Meteo:`, err instanceof Error ? err.message : String(err));
     }
   }
 

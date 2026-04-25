@@ -46,6 +46,8 @@ export interface ShellProps {
   children: ReactNode;
   /** Everything rendered inside the side rail (<aside>). */
   sideContent: ReactNode;
+  currentTab: 'overview' | 'analytics';
+  onTabChange: (tab: 'overview' | 'analytics') => void;
 }
 
 export function Shell({
@@ -62,6 +64,8 @@ export function Shell({
   modeSegment,
   children,
   sideContent,
+  currentTab,
+  onTabChange,
 }: ShellProps) {
   const t = (key: DictKey) => translate(key, locale);
   const statusMeta = STATUS_META[status];
@@ -113,7 +117,10 @@ export function Shell({
 
         <div className="nav-section">
           <div className="nav-section-title">{t('nav.monitor')}</div>
-          <button className="nav-item active">
+          <button 
+            className={`nav-item ${currentTab === 'overview' ? 'active' : ''}`}
+            onClick={() => onTabChange('overview')}
+          >
             <Home size={16} />
             {t('nav.overview')}
           </button>
@@ -121,7 +128,10 @@ export function Shell({
             <MapIcon size={16} />
             {t('nav.livemap')}
           </button>
-          <button className="nav-item">
+          <button 
+            className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`}
+            onClick={() => onTabChange('analytics')}
+          >
             <BarChart3 size={16} />
             {t('nav.analytics')}
           </button>

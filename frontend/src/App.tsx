@@ -15,6 +15,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { Shell } from './components/Shell';
 import { Dashboard } from './components/Dashboard';
 import { ReportModal } from './components/ReportModal';
+import { AnalyticsView } from './components/panels/AnalyticsView';
 
 /* ═══════════════════════════ SESSION INIT ═══════════════════════════ */
 
@@ -102,9 +103,15 @@ export default function App() {
         onOpenReportModal={() => setReportModalOpen(true)}
         onLogout={handleLogout}
         modeSegment={modeSegment}
-        sideContent={<Dashboard data={data} position="side" />}
+        currentTab={data.currentTab}
+        onTabChange={data.setCurrentTab}
+        sideContent={data.currentTab === 'overview' ? <Dashboard data={data} position="side" /> : null}
       >
-        <Dashboard data={data} position="main" />
+        {data.currentTab === 'overview' ? (
+          <Dashboard data={data} position="main" />
+        ) : (
+          <AnalyticsView authToken={authToken} />
+        )}
       </Shell>
 
       <ReportModal
