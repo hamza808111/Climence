@@ -853,6 +853,120 @@ html[dir='rtl'] .map-panel-br {
   color: var(--ink-1);
 }
 
+.map-sensor-icon-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.map-sensor-marker {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+.map-sensor-core {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  background: var(--marker-fill, var(--aqi-good));
+  border: 2px solid oklch(1 0 0 / 0.95);
+  box-shadow: 0 0 0 3px oklch(0 0 0 / 0.24), 0 6px 18px color-mix(in oklch, var(--marker-fill, var(--aqi-good)) 34%, transparent);
+}
+
+.map-sensor-ring {
+  position: absolute;
+  inset: 4px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--marker-fill, var(--aqi-good)) 68%, white);
+  opacity: 0.38;
+}
+
+.map-sensor-marker.is-offline {
+  opacity: 0.35;
+}
+
+.map-sensor-marker.is-gathering-data {
+  animation: map-sensor-pulse 1.65s ease-in-out infinite;
+}
+
+.map-sensor-marker.is-low-battery .map-sensor-ring {
+  inset: 1px;
+  border: 2px solid var(--warn);
+  opacity: 0.92;
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.72), 0 0 12px color-mix(in oklch, var(--warn) 38%, transparent);
+}
+
+.map-sensor-battery {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 11px;
+  height: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.92);
+  border: 1px solid color-mix(in oklch, var(--warn) 30%, white);
+  box-shadow: 0 4px 12px oklch(0.34 0.01 80 / 0.16);
+}
+
+.map-sensor-battery-cell {
+  width: 5px;
+  height: 4px;
+  border: 1.5px solid var(--warn);
+  border-radius: 1px;
+}
+
+.map-sensor-battery-tip {
+  width: 1.5px;
+  height: 3px;
+  border-radius: 1px;
+  background: var(--warn);
+}
+
+@keyframes map-sensor-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.leaflet-tooltip.map-sensor-tooltip {
+  background: oklch(1 0 0 / 0.94);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  box-shadow: 0 14px 30px oklch(0.34 0.01 80 / 0.16);
+  color: var(--ink-0);
+  padding: 8px 10px;
+}
+
+.leaflet-tooltip-top.map-sensor-tooltip::before {
+  border-top-color: var(--line-strong);
+}
+
+.map-sensor-tooltip-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-0);
+  margin-bottom: 2px;
+}
+
+.map-sensor-tooltip-meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
 .sensor {
   position: absolute;
   width: 14px;
@@ -2014,4 +2128,3 @@ html[dir="rtl"] .trend-pill { letter-spacing: 0; }
 html[dir="rtl"] .modal-head,
 html[dir="rtl"] .sched-row,
 html[dir="rtl"] .sched-item { direction: rtl; }
-

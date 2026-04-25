@@ -84,6 +84,7 @@ interface SensorPoint {
   humidity: number;
   battery: number;
   rssi: number;
+  droneState: DroneState;
   status: 'online' | 'offline';
   serverTimestamp: string;
 }
@@ -226,6 +227,7 @@ function toSensorPoint(drone: TelemetryRecord, index: number): SensorPoint {
     humidity: drone.humidity,
     battery: drone.batteryLevel,
     rssi: drone.rssi,
+    droneState: drone.state,
     status: drone.state === DroneState.OFFLINE ? 'offline' : 'online',
     serverTimestamp: drone.server_timestamp,
   };
@@ -549,7 +551,6 @@ export default function App() {
 
   const { snapshot, status } = useLiveTelemetry(authToken);
   const statusMeta = STATUS_META[status];
-  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   useEffect(() => {
     document.documentElement.setAttribute('dir', rtl ? 'rtl' : 'ltr');
@@ -1214,7 +1215,6 @@ export default function App() {
 
         <div className="stage">
           <RiyadhGoogleMap
-            apiKey={googleMapsApiKey}
             mode={mode}
             sensors={sensors}
             hotspots={mapHotspots}

@@ -59,6 +59,13 @@ You own **everything the user sees first**: the app shell, the KPI strip, the Ri
 
 ---
 
+> ✅ **DONE — 2026-04-25.**
+> Branch: `oussama/frontend-map-drill-down`.
+> Files changed: [frontend/src/components/map/RiyadhGoogleMap.tsx](../../frontend/src/components/map/RiyadhGoogleMap.tsx), [frontend/src/components/map/markerState.ts](../../frontend/src/components/map/markerState.ts), [frontend/src/App.tsx](../../frontend/src/App.tsx), [frontend/src/index.css](../../frontend/src/index.css), [frontend/test/markerState.test.ts](../../frontend/test/markerState.test.ts), [frontend/package.json](../../frontend/package.json).
+> Tests: **29/29 green** (`npm run test --silent`), plus repo type/lint green (`npm run typecheck`, `npm run lint`), frontend build green (`npm run build -w @climence/dashboard`), and manual dev boot verified (`npm run dev`).
+> Requirement IDs moved: none — **FR-04** remained Implemented; **UC1** notes were refreshed with state-aware live marker evidence.
+> Heads-up: `INVESTIGATING_HAZARD` currently falls back to the default marker visual, so the next map slice only needs to extend `markerState.ts` if product wants a dedicated icon.
+
 ### P1 — Encode drone state on markers
 
 **Files:** [frontend/src/components/map/RiyadhGoogleMap.tsx](../../frontend/src/components/map/RiyadhGoogleMap.tsx)

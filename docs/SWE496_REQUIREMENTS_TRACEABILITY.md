@@ -13,7 +13,7 @@ Status scale:
 | FR-01 | Collect pollution data from IoT, drones, external APIs | 6.1.A | Partial | `simulator/src/DroneDevice.ts`, `simulator/src/FleetManager.ts`, `backend/src/routes/telemetry.ts` |
 | FR-02 | Secure login with ministry credentials | 6.1.B | Implemented | `backend/src/routes/auth.ts`, `frontend/src/App.tsx` login flow, `backend/src/features/auth/lockout.ts` (5 fails / 10 min → 15 min lock per UC-A6) |
 | FR-03 | Role-based access (admin/analyst/viewer) | 6.1.B | Partial | Auth roles enforced for protected APIs and admin alert settings; broader module-level RBAC still expanding |
-| FR-04 | Real-time pollution map | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` |
+| FR-04 | Real-time pollution map | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` (Leaflet map, state-aware markers, offline timestamp tooltips), `frontend/src/components/map/markerState.ts` (AQI-fill marker state mapping), `frontend/src/index.css` (marker visuals), `frontend/test/markerState.test.ts` (frontend marker-state unit coverage) |
 | FR-05 | Zoom/pan between regions/cities/zones | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` (city/sector/zone presets, fly-to, live viewport/zoom callbacks), `frontend/src/App.tsx` (bounds-aware KPI/viewing panels + hotspot fly-to wiring) |
 | FR-06 | Pollutant switching (CO2/NO2/PM2.5/O3...) | 6.1.C | Partial | UI switching in `frontend/src/App.tsx` |
 | FR-07 | Display AQI by region | 6.1.C | Partial | Sensor/city AQI implemented; regional aggregation incomplete |
@@ -50,7 +50,7 @@ Status scale:
 
 | Use Case | Status | Notes |
 | --- | --- | --- |
-| UC1 Real-Time Map | Partial | Core implemented, some edge flows pending |
+| UC1 Real-Time Map | Partial | Drill-down, viewport-aware counts, hotspot fly-to, and drone-state marker cues are implemented; pollutant heat switching and fuller regional aggregation are still pending |
 | UC2 Historical Trends | Partial | Core charting implemented, richer data controls pending |
 | UC3 Forecast | Partial | UI present, production forecasting pipeline pending |
 | UC4 Generate Reports | Implemented | Reports modal (topbar + left nav) exports CSV / JSON / print-to-PDF of live snapshot |
@@ -106,3 +106,10 @@ Delivered requirement slice:
 - FR-05: implemented map drill-down controls (`City` / `Sector` / `Zone`), hotspot fly-to at zoom 14, and live zoom display wiring (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/App.tsx`).
 - UC1: strengthened real-time map exploration by propagating map bounds to the shell and applying viewport-aware sensor counts in KPI and map viewing panels (`frontend/src/App.tsx`).
 - FR-10 UI compatibility hardening: hotspot circles now consume `radiusKm` when present with safe fallback radius to preserve rendering across backend payload versions (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/App.tsx`).
+
+## Iteration (2026-04-25 — Oussama · drone-state markers)
+
+Delivered requirement slice:
+
+- FR-04: encoded `OFFLINE`, `LOW_BATTERY`, `GATHERING_DATA`, and `EN_ROUTE` marker cues in the Leaflet map while preserving AQI band fill (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/components/map/markerState.ts`, `frontend/src/index.css`).
+- UC1: strengthened live map diagnostics with offline timestamp tooltips/popup labels and added frontend unit coverage for the marker-state mapping (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/test/markerState.test.ts`).
