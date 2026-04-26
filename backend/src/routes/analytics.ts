@@ -15,6 +15,10 @@
  */
 
 import { Router } from 'express';
+import { getCityTrend, getHotspots } from '../db/queries';
+import { rolesForPermission } from '../features/auth/permissions';
+import { requireAuth, requireRole } from '../lib/auth';
+import { sendInternalError } from '../lib/http';
 import {
   getCityTrend,
   getAlertThresholdPm25,
@@ -33,7 +37,9 @@ import { requireAuth } from '../lib/auth.js';
 import { sendBadRequest, sendInternalError } from '../lib/http.js';
 
 const router = Router();
+const canViewAnalytics = rolesForPermission('canViewAnalytics');
 
+router.get('/city-trend', requireAuth, requireRole(...canViewAnalytics), (_req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/analytics/city-trend
 // ---------------------------------------------------------------------------
@@ -45,6 +51,7 @@ router.get('/city-trend', requireAuth, (_req, res) => {
   }
 });
 
+router.get('/hotspots', requireAuth, requireRole(...canViewAnalytics), (_req, res) => {
 // ---------------------------------------------------------------------------
 // GET /api/analytics/hotspots  (legacy grid-bucket, kept for compat)
 // ---------------------------------------------------------------------------
