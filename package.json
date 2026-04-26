@@ -1,24 +1,27 @@
 {
   "name": "climence",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "description": "Drone fleet air-quality monitoring for Riyadh: simulator, ingestion API, and live dashboard.",
+  "workspaces": [
+    "shared",
+    "simulator",
+    "backend",
+    "frontend"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^1.14.0",
-    "geolib": "^3.3.4",
-    "uuid": "^13.0.0"
+    "dev": "concurrently -n api,sim,ui -c cyan,magenta,green \"npm:dev:api\" \"npm:dev:sim\" \"npm:dev:ui\"",
+    "dev:api": "npm run dev -w @climence/api",
+    "dev:sim": "npm run dev -w @climence/simulator",
+    "dev:ui": "npm run dev -w @climence/dashboard",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "test:integration:api": "npm run test:integration -w @climence/api"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0",
-    "@types/uuid": "^10.0.0",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+    "concurrently": "^9.1.0"
   }
 }
