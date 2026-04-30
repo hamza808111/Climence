@@ -14,6 +14,14 @@ export interface HeatmapPoint {
   intensity: number;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 export function HeatmapLayer({
   drones,
   points,
@@ -32,10 +40,18 @@ export function HeatmapLayer({
   const map = useMap();
 
   useEffect(() => {
+    const size = map.getSize();
+    if (size.x <= 0 || size.y <= 0) return;
+
     const heatPoints = points ?? drones?.map(d => ({ lat: d.lat, lng: d.lng, intensity: d.pm25 })) ?? [];
-    if (heatPoints.length === 0) return;
-    const heatData: [number, number, number][] = heatPoints.map(point => [point.lat, point.lng, point.intensity]);
-    const heatLayer = (L as unknown as HeatLayerApi)
+    const heatData: [number, number, number][] = heatPoints
+      .filter(point => isFiniteNumber(point.lat) && isFiniteNumber(point.lng) && isFiniteNumber(point.intensity))
+      .map(point => [point.lat, point.lng, clamp(point.intensity, 0.05, max)]);
+
+    if (heatData.length === 0) return;
+
+    const api = L as unknown as HeatLayerApi;
+    const heatLayer = api
       .heatLayer(heatData, {
         radius,
         blur,

@@ -168,6 +168,23 @@ function resampleSeries(input: number[], target: number) {
   return out;
 }
 
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isValidTelemetryRecord(drone: TelemetryRecord) {
+  return (
+    isFiniteNumber(drone.lat) &&
+    isFiniteNumber(drone.lng) &&
+    isFiniteNumber(drone.pm25) &&
+    isFiniteNumber(drone.co2) &&
+    isFiniteNumber(drone.no2) &&
+    isFiniteNumber(drone.temperature) &&
+    isFiniteNumber(drone.humidity) &&
+    isFiniteNumber(drone.batteryLevel)
+  );
+}
+
 export function makePath(data: number[], width: number, height: number, padding: { l: number; r: number; t: number; b: number }, maxValue: number) {
   if (data.length === 0) return '';
   const innerW = width - padding.l - padding.r;
@@ -284,7 +301,7 @@ export function useDashboardData(
   const [mapBounds, setMapBounds] = useState<RiyadhMapBounds | null>(null);
   const [mapZoom, setMapZoom] = useState(11);
   const [zoomPreset, setZoomPreset] = useState<RiyadhZoomPreset>('city');
-  const [currentTab, setCurrentTab] = useState<'overview' | 'analytics'>('overview');
+  const [currentTab, setCurrentTab] = useState<'overview' | 'livemap' | 'analytics'>('overview');
   const [mapFocusTarget, setMapFocusTarget] = useState<{ lat: number; lng: number; zoom?: number; nonce: number } | null>(null);
   const [historySeries, setHistorySeries] = useState<number[]>([]);
   const [historySourceUuid, setHistorySourceUuid] = useState<string | null>(null);
@@ -301,13 +318,18 @@ export function useDashboardData(
     return () => { cancelled = true; };
   }, [authToken]);
 
-  const sensorProjectionSignature = useMemo(
-    () => snapshot.drones.map(d => [d.uuid, d.state, d.lat, d.lng, d.pm25, d.co2, d.no2, d.temperature, d.humidity, d.batteryLevel, d.rssi, d.server_timestamp].join(':')).join('|'),
+  const validDrones = useMemo(
+    () => snapshot.drones.filter(isValidTelemetryRecord),
     [snapshot.drones],
   );
 
+  const sensorProjectionSignature = useMemo(
+    () => validDrones.map(d => [d.uuid, d.state, d.lat, d.lng, d.pm25, d.co2, d.no2, d.temperature, d.humidity, d.batteryLevel, d.rssi, d.server_timestamp].join(':')).join('|'),
+    [validDrones],
+  );
+
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const sensors = useMemo(() => snapshot.drones.map((d, i) => toSensorPoint(d, i)).sort((a, b) => b.aqi - a.aqi), [sensorProjectionSignature]);
+  const sensors = useMemo(() => validDrones.map((d, i) => toSensorPoint(d, i)).sort((a, b) => b.aqi - a.aqi), [sensorProjectionSignature, validDrones]);
   const onlineSensors = useMemo(() => sensors.filter(s => s.status === 'online').length, [sensors]);
   const sensorsInView = useMemo(() => mapBounds ? sensors.filter(s => isSensorInBounds(s, mapBounds)) : sensors, [mapBounds, sensors]);
   const onlineSensorsInView = useMemo(() => sensorsInView.filter(s => s.status === 'online').length, [sensorsInView]);

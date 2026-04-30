@@ -5,6 +5,22 @@ import {
   type TelemetryRecord,
 } from '@climence/shared';
 
+export class ApiError extends Error {
+  readonly status?: number;
+  readonly retryAfterSec?: number;
+
+  constructor(
+    message: string,
+    status?: number,
+    retryAfterSec?: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
 function withAuth(token?: string) {
   return token ? ({ Authorization: `Bearer ${token}` } as Record<string, string>) : {};
 }
@@ -53,7 +69,28 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error(`Login failed: ${res.status}`);
+  if (!res.ok) {
+    let message = `Login failed (${res.status})`;
+    let retryAfterSec: number | undefined;
+
+    const retryAfter = res.headers.get('retry-after');
+    if (retryAfter) {
+      const parsed = Number(retryAfter);
+      if (Number.isFinite(parsed) && parsed > 0) retryAfterSec = parsed;
+    }
+
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (typeof body?.message === 'string' && body.message.trim()) {
+        message = body.message;
+      }
+    } catch {
+      // Non-JSON response; keep the status-based fallback message.
+    }
+
+    throw new ApiError(message, res.status, retryAfterSec);
+  }
+
   return res.json() as Promise<LoginResponse>;
 }
 

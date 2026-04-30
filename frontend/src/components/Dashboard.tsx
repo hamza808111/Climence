@@ -5,6 +5,7 @@
  * the main area (KPI strip + map stage) or the side rail panels, controlled
  * by the `position` prop. No business logic lives here — only JSX.
  */
+import { useEffect, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -184,51 +185,70 @@ export function Dashboard({ data: d, position }: DashboardProps) {
 function MainContent({ d }: { d: DashboardData }) {
   const statusLabel = d.status === 'open' ? 'live' : d.status === 'connecting' ? 'connecting' : 'reconnecting';
   const statusDotClass = d.status === 'open' ? 'ok' : 'warn';
+  const [kpiCollapsed, setKpiCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('climence.kpi-collapsed') === '1';
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('climence.kpi-collapsed', kpiCollapsed ? '1' : '0');
+  }, [kpiCollapsed]);
+
+  const kpiSummary = `AQI ${d.cityAqi} · ${aqiBandFor(d.cityAqi).label.toUpperCase()} · ${d.feed.length} Alerts · ${d.onlineSensorsInView}/${d.sensorsInView.length} Sensors`;
 
   return (
     <>
-      <div className="kpi-strip">
-        <div className="kpi">
-          <div className="kpi-label eyebrow"><Activity size={11} /> {d.t('kpi.city')}</div>
-          <div className="kpi-row">
-            <div className="kpi-value" style={{ color: `var(--aqi-${d.cityBand})` }}>{d.cityAqi}</div>
-            <span className="band"><span className="dot" style={{ background: `var(--aqi-${d.cityBand})` }} />{aqiBandFor(d.cityAqi).label}</span>
-            <span className={`kpi-delta ${d.currentDelta >= 0 ? 'up' : 'down'}`}>
-              {d.currentDelta >= 0 ? <ArrowUp size={11} strokeWidth={2.5} /> : <ArrowDown size={11} strokeWidth={2.5} />}
-              {d.currentDelta >= 0 ? '+' : ''}{d.currentDelta} vs. prev
-            </span>
+      <div className={`kpi-bar ${kpiCollapsed ? 'collapsed' : ''}`}>
+        <div className="kpi-bar-header">
+          <div className="kpi-summary mono tnum">{kpiSummary}</div>
+          <button className="kpi-toggle" onClick={() => setKpiCollapsed(prev => !prev)} aria-label="Toggle KPI bar">
+            {kpiCollapsed ? '▼' : '▲'}
+          </button>
+        </div>
+        <div className="kpi-strip">
+          <div className="kpi">
+            <div className="kpi-label eyebrow"><Activity size={11} /> {d.t('kpi.city')}</div>
+            <div className="kpi-row kpi-row--baseline">
+              <div className="kpi-value" style={{ color: `var(--aqi-${d.cityBand})` }}>{d.cityAqi}</div>
+              <span className="band kpi-band"><span className="dot" style={{ background: `var(--aqi-${d.cityBand})` }} />{aqiBandFor(d.cityAqi).label}</span>
+              <span className={`kpi-delta ${d.currentDelta >= 0 ? 'up' : 'down'}`}>
+                {d.currentDelta >= 0 ? <ArrowUp size={11} strokeWidth={2.5} /> : <ArrowDown size={11} strokeWidth={2.5} />}
+                {d.currentDelta >= 0 ? '+' : ''}{d.currentDelta} vs. prev
+              </span>
+            </div>
+            <div className="kpi-spark"><Sparkline data={d.pm25Series} color="oklch(0.68 0.20 28)" width={240} height={26} /></div>
           </div>
-          <div className="kpi-spark"><Sparkline data={d.pm25Series} color="oklch(0.68 0.20 28)" width={240} height={26} /></div>
-        </div>
 
-        <div className="kpi">
-          <div className="kpi-label eyebrow"><Flame size={11} /> {d.t('kpi.dominant')}</div>
-          <div className="kpi-row"><div className="kpi-value">{d.activePollutant}</div><span className="kpi-unit">{d.pollutantMap[d.pollutant]} current</span></div>
-          <div className="kpi-meta tnum">Data from {d.sensors.length || 0} active sensors</div>
-        </div>
-
-        <div className="kpi">
-          <div className="kpi-label eyebrow"><Siren size={11} /> {d.t('kpi.alerts')}</div>
-          <div className="kpi-row"><div className="kpi-value" style={{ color: 'var(--aqi-unh)' }}>{d.feed.length}</div><span className="kpi-unit">threshold {d.effectiveAlertThreshold}+ ug/m3</span></div>
-          <div className="kpi-meta">{d.feed.length} items in live feed</div>
-        </div>
-
-        <div className="kpi">
-          <div className="kpi-label eyebrow"><Radio size={11} /> {d.t('kpi.sensors')}</div>
-          <div className="kpi-row">
-            <div className="kpi-value">{d.onlineSensorsInView}<span style={{ color: 'var(--ink-3)', fontSize: 22 }}>/{d.sensorsInView.length}</span></div>
-            <span className="kpi-delta down"><ArrowDown size={11} strokeWidth={2.5} />{Math.max(0, d.sensorsInView.length - d.onlineSensorsInView)} offline</span>
+          <div className="kpi">
+            <div className="kpi-label eyebrow"><Flame size={11} /> {d.t('kpi.dominant')}</div>
+            <div className="kpi-row kpi-row--baseline"><div className="kpi-value">{d.activePollutant}</div><span className="kpi-unit">{d.pollutantMap[d.pollutant]} current</span></div>
+            <div className="kpi-meta tnum">Data from {d.sensors.length || 0} active sensors</div>
           </div>
-          <div className="kpi-meta">{d.mapBounds ? `Viewport filter active · ${statusLabel}` : `Realtime stream · ${statusLabel}`}</div>
-        </div>
 
-        <div className="kpi">
-          <div className="kpi-label eyebrow"><Wind size={11} /> {d.t('kpi.wind')}</div>
-          <div className="kpi-row">
-            <div className="kpi-value">{d.drift.speedKmh}<span className="kpi-unit" style={{ fontSize: 14, marginLeft: 4 }}>km/h</span></div>
-            <span className="band" style={{ paddingTop: 3 }}><span className="dot" style={{ background: 'var(--brand)' }} />→ {d.drift.cardinal}</span>
+          <div className="kpi">
+            <div className="kpi-label eyebrow"><Siren size={11} /> {d.t('kpi.alerts')}</div>
+            <div className="kpi-row kpi-row--baseline"><div className="kpi-value" style={{ color: 'var(--aqi-unh)' }}>{d.feed.length}</div><span className="kpi-unit">threshold {d.effectiveAlertThreshold}+ ug/m3</span></div>
+            <div className="kpi-meta">{d.feed.length} items in live feed</div>
           </div>
-          <div className="kpi-meta">Humidity {d.humidityNow}% · Temp {d.tempNow}°C</div>
+
+          <div className="kpi">
+            <div className="kpi-label eyebrow"><Radio size={11} /> {d.t('kpi.sensors')}</div>
+            <div className="kpi-row kpi-row--baseline">
+              <div className="kpi-value">{d.onlineSensorsInView}<span className="kpi-value-sub">/{d.sensorsInView.length}</span></div>
+              <span className="kpi-delta down"><ArrowDown size={11} strokeWidth={2.5} />{Math.max(0, d.sensorsInView.length - d.onlineSensorsInView)} offline</span>
+            </div>
+            <div className="kpi-meta">{d.mapBounds ? `Viewport filter active · ${statusLabel}` : `Realtime stream · ${statusLabel}`}</div>
+          </div>
+
+          <div className="kpi">
+            <div className="kpi-label eyebrow"><Wind size={11} /> {d.t('kpi.wind')}</div>
+            <div className="kpi-row kpi-row--center">
+              <div className="kpi-value">{d.drift.speedKmh}<span className="kpi-unit">km/h</span></div>
+              <span className="band kpi-inline"><span className="dot" style={{ background: 'var(--brand)' }} />→ {d.drift.cardinal}</span>
+            </div>
+            <div className="kpi-meta">Humidity {d.humidityNow}% · Temp {d.tempNow}°C</div>
+          </div>
         </div>
       </div>
 
@@ -257,6 +277,7 @@ function MainContent({ d }: { d: DashboardData }) {
           <div className="legend-title"><span className="eyebrow">{d.activeMetricConfig.legendTitle}</span><span className="mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{d.activePollutant}</span></div>
           <div className="legend-ramp">{AQI_BANDS.map(band => (<div key={band.key} style={{ background: `var(--aqi-${band.key})` }} />))}</div>
           <div className="legend-scale tnum">{d.activeMetricConfig.legendStops.map(stop => (<span key={stop}>{stop}</span>))}</div>
+          <div className="legend-direction">WORSE →</div>
           <div className="legend-bands">{AQI_BANDS.slice(0, 4).map(band => (<div key={band.key} className="legend-row"><span className="sw" style={{ background: `var(--aqi-${band.key})` }} /><span>{band.label}</span></div>))}</div>
         </div>
 
@@ -275,7 +296,7 @@ function MainContent({ d }: { d: DashboardData }) {
         <div className="statusbar desktop-only">
           <span className="item"><span className={`d ${statusDotClass}`} />Stream · {statusLabel}</span>
           <span className="item">Model v2.1.4</span>
-          <span className="item">Lat. 42ms</span>
+          <span className="item latency latency--good">Lat. 42ms</span>
           <span className="spacer" />
           <span className="item">Riyadh · UTC+3</span>
           <span className="item">24.7136°, 46.6753°</span>
@@ -294,7 +315,7 @@ function SideContent({ d }: { d: DashboardData }) {
     <>
       <div className="banner">
         <div className="banner-icon"><AlertTriangle size={14} /></div>
-        <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="banner-body">
           <div className="banner-title">{d.t('banner.over')} · +{d.thresholdExceededBy} µg/m³</div>
           <div className="banner-sub">Citywide advisory active</div>
         </div>

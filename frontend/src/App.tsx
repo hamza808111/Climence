@@ -16,6 +16,7 @@ import { Shell } from './components/Shell';
 import { Dashboard } from './components/Dashboard';
 import { ReportModal } from './components/ReportModal';
 import { AnalyticsView } from './components/panels/AnalyticsView';
+import { LiveMapView } from './components/panels/LiveMapView';
 
 /* ═══════════════════════════ SESSION INIT ═══════════════════════════ */
 
@@ -79,7 +80,7 @@ export default function App() {
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
 
   const modeSegment = (
-    <div className="seg desktop-only" style={{ marginLeft: 8 }}>
+  <div className="seg desktop-only mode-segment">
       <button className={`seg-btn ${data.mode === 'hardware' ? 'active' : ''}`} onClick={() => data.setMode('hardware')}>
         <Grid2x2 size={12} /> {t('seg.hardware')}
       </button>
@@ -107,11 +108,9 @@ export default function App() {
         onTabChange={data.setCurrentTab}
         sideContent={data.currentTab === 'overview' ? <Dashboard data={data} position="side" /> : null}
       >
-        {data.currentTab === 'overview' ? (
-          <Dashboard data={data} position="main" />
-        ) : (
-          <AnalyticsView authToken={authToken} />
-        )}
+        {data.currentTab === 'overview' && <Dashboard data={data} position="main" />}
+        {data.currentTab === 'livemap' && <LiveMapView data={data} />}
+        {data.currentTab === 'analytics' && <AnalyticsView authToken={authToken} />}
       </Shell>
 
       <ReportModal

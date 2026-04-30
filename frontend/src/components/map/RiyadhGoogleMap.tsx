@@ -41,10 +41,22 @@ export interface RiyadhMapSensor {
   serverTimestamp: string;
 }
 
+export interface RiyadhMapCluster {
+  id: string;
+  lat: number;
+  lng: number;
+  count: number;
+  radiusMeters: number;
+  avgPm25: number;
+  maxPm25: number;
+  minBattery: number;
+}
+
 interface Props {
   mode: RiyadhMapMode;
   sensors: RiyadhMapSensor[];
   hotspots?: RiyadhMapHotspot[];
+  clusters?: RiyadhMapCluster[];
   heatmapPoints?: HeatmapPoint[];
   zoomPreset?: RiyadhZoomPreset;
   focusTarget?: { lat: number; lng: number; zoom?: number; nonce: number } | null;
@@ -117,6 +129,7 @@ export function RiyadhGoogleMap({
   mode,
   sensors,
   hotspots = [],
+  clusters = [],
   heatmapPoints = [],
   zoomPreset = 'city',
   focusTarget = null,
@@ -192,6 +205,61 @@ export function RiyadhGoogleMap({
             </Circle>
           );
         })}
+
+        {clusters.map(cluster => {
+          const severityBand: AqiBandKey =
+            cluster.maxPm25 >= 150
+              ? 'haz'
+              : cluster.maxPm25 >= 110
+                ? 'unh'
+                : cluster.maxPm25 >= 75
+                  ? 'usg'
+                  : 'mod';
+          const clusterColor = BAND_COLOR[severityBand];
+
+          return (
+            <Circle
+              key={`cluster-area-${cluster.id}`}
+              center={[cluster.lat, cluster.lng]}
+              radius={Math.max(300, cluster.radiusMeters)}
+              pathOptions={{
+                color: clusterColor,
+                fillColor: clusterColor,
+                fillOpacity: 0.09,
+                weight: 1.5,
+                opacity: 0.58,
+                dashArray: '5 6',
+              }}
+            >
+              <Popup>
+                <strong>Cluster · {cluster.count} sensors</strong>
+                <div>Avg PM2.5 {cluster.avgPm25.toFixed(1)}</div>
+                <div>Peak PM2.5 {cluster.maxPm25.toFixed(1)}</div>
+                <div>Min battery {Math.round(cluster.minBattery)}%</div>
+              </Popup>
+            </Circle>
+          );
+        })}
+
+        {clusters.map(cluster => (
+          <Marker
+            key={`cluster-count-${cluster.id}`}
+            position={[cluster.lat, cluster.lng]}
+            icon={divIcon({
+              className: 'map-cluster-icon-wrap',
+              html: `<div class="map-cluster-marker"><span class="map-cluster-count">${cluster.count}</span></div>`,
+              iconSize: [34, 34],
+              iconAnchor: [17, 17],
+            })}
+            zIndexOffset={900 + cluster.count}
+          >
+            <Popup>
+              <strong>Cluster · {cluster.count} sensors</strong>
+              <div>Avg PM2.5 {cluster.avgPm25.toFixed(1)}</div>
+              <div>Peak PM2.5 {cluster.maxPm25.toFixed(1)}</div>
+            </Popup>
+          </Marker>
+        ))}
 
         {sortedSensors.map(sensor => {
           const icon = sensorIcons.get(sensor.uuid);

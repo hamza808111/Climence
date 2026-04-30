@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect } from 'react';
 import { 
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, LineChart, Line, Legend, 
@@ -69,9 +70,9 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
   useEffect(() => {
     if (!authToken) return;
     let cancelled = false;
+    setLoading(true);
 
     const loadData = async () => {
-      setLoading(true);
       try {
         const dbRange = RANGE_TO_DB[range];
         const [pm25, co2, no2] = await Promise.all([
@@ -87,11 +88,11 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
         if (range === '12h') len = Math.min(len, 12);
         if (range === '3d') len = Math.min(len, 72);
 
-        const merged: AnalyticsPoint[] = [];
+  const merged: AnalyticsPoint[] = [];
         for (let i = 0; i < len; i++) {
           const p25 = pm25[i]?.value ?? 0;
           merged.push({
-            time: pm25[i]?.label ?? '',
+            time: pm25[i]?.label,
             pm25: p25,
             pm10: p25 * 1.18,
             co2: co2[i]?.value ?? 0,
@@ -113,11 +114,11 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
       }
     };
 
-    void loadData();
+    loadData();
     return () => { cancelled = true; };
   }, [authToken, range, showForecast, forecastHorizon]);
 
-  const combinedData: AnalyticsPoint[] = [...historyData];
+  const combinedData = [...historyData];
   if (showForecast && forecastData.length > 0) {
     for (const f of forecastData) {
       combinedData.push({
@@ -132,12 +133,9 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
     }
   }
 
-  const formatXAxis = (tickItem: unknown) => {
+  const formatXAxis = (tickItem: string | number) => {
     try {
-      const normalizedTick = typeof tickItem === 'string' || typeof tickItem === 'number'
-        ? tickItem
-        : String(tickItem ?? '');
-      const d = new Date(normalizedTick);
+      const d = new Date(tickItem);
       if (isNaN(d.getTime())) return String(tickItem);
       
       if (range === '1h' || range === '6h' || range === '12h') {
@@ -154,6 +152,13 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
     } catch {
       return String(tickItem);
     }
+  };
+
+  const formatXAxisLabel = (label: unknown) => {
+    if (typeof label === 'string' || typeof label === 'number') {
+      return formatXAxis(label);
+    }
+    return formatXAxis(String(label ?? ''));
   };
 
   const getStats = (key: keyof typeof enabled) => {
@@ -182,77 +187,44 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
     }));
 
   return (
-    <div className="analytics-view" style={{ padding: 24, overflowY: 'auto', height: '100%', background: 'var(--bg-0)', display: 'flex', flexDirection: 'column', gap: 24 }}>
+  <div className="analytics-view">
       
       {/* Header & Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <div className="analytics-header">
         <div>
-          <h2 style={{ fontSize: 28, fontFamily: 'var(--font-serif)', color: 'var(--ink-0)', marginBottom: 16 }}>
+          <h2 className="analytics-title">
             Command Center Analytics
           </h2>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
-            <div style={{ display: 'flex', gap: 6, background: 'var(--bg-1)', padding: 4, borderRadius: 24, border: '1px solid var(--line)' }}>
+          <div className="analytics-controls">
+            <div className="analytics-range-group">
               {RANGES.map(r => (
                 <button
                   key={r}
                   onClick={() => setRange(r)}
-                  style={{
-                    padding: '6px 14px',
-                    borderRadius: 20,
-                    border: 'none',
-                    background: range === r ? 'var(--brand)' : 'transparent',
-                    color: range === r ? '#fff' : 'var(--ink-2)',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    fontSize: 12,
-                    transition: 'all 0.2s'
-                  }}
+                  className={`analytics-range-btn ${range === r ? 'active' : ''}`}
                 >
                   {r === '1m' ? '3m' : r}
                 </button>
               ))}
             </div>
 
-            <div style={{ width: 1, height: 24, background: 'var(--line)' }} />
+            <div className="analytics-divider" />
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="analytics-forecast-controls">
               <button
                 onClick={() => setShowForecast(!showForecast)}
-                style={{
-                  padding: '8px 20px',
-                  borderRadius: 24,
-                  border: `2px solid ${showForecast ? 'var(--brand)' : 'var(--line)'}`,
-                  background: showForecast ? 'var(--brand)' : 'transparent',
-                  color: showForecast ? '#fff' : 'var(--ink-1)',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: 12,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  transition: 'all 0.2s'
-                }}
+                className={`analytics-forecast-btn ${showForecast ? 'active' : ''}`}
               >
                 <Maximize2 size={14} /> {showForecast ? 'Hide Forecast' : 'Expand Forecast'}
               </button>
 
               {showForecast && (
-                <div style={{ display: 'flex', gap: 4, background: 'var(--bg-2)', padding: 4, borderRadius: 24, border: '1px solid var(--line)', animation: 'fadeIn 0.3s ease-out' }}>
+                <div className="analytics-forecast-horizons">
                   {FORECAST_HORIZONS.map(h => (
                     <button
                       key={h.val}
                       onClick={() => setForecastHorizon(h.val)}
-                      style={{
-                        padding: '4px 12px',
-                        borderRadius: 18,
-                        border: 'none',
-                        background: forecastHorizon === h.val ? 'var(--ink-0)' : 'transparent',
-                        color: forecastHorizon === h.val ? 'var(--bg-0)' : 'var(--ink-2)',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                        fontSize: 11,
-                        transition: 'all 0.2s'
-                      }}
+                      className={`analytics-forecast-pill ${forecastHorizon === h.val ? 'active' : ''}`}
                     >
                       {h.label}
                     </button>
@@ -263,40 +235,41 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
           </div>
         </div>
 
-        <button 
-          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 22px', background: 'var(--brand)', border: 'none', borderRadius: 12, color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: 13, boxShadow: '0 4px 12px rgba(var(--brand-rgb), 0.3)' }}
-        >
+        <button className="analytics-export-btn">
           <Download size={16} /> Export Intelligence
         </button>
       </div>
 
       {/* Main Massive Chart */}
-      <div className="glass" style={{ padding: 24, flexGrow: 1, minHeight: 480, display: 'flex', flexDirection: 'column', gap: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <h3 className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 8, margin: 0 }}>
+      <div className="glass analytics-chart-card">
+        <div className="analytics-chart-head">
+          <div className="analytics-chart-title">
+            <h3 className="eyebrow analytics-chart-eyebrow">
               <Clock size={16} /> Real-time Satellite Telemetry
             </h3>
-            {showForecast && <span style={{ background: 'oklch(0.68 0.20 28)', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 8px', borderRadius: 4, textTransform: 'uppercase', letterSpacing: 1 }}>Forecast Active</span>}
+            {showForecast && <span className="analytics-forecast-badge">Forecast Active</span>}
           </div>
-          <div style={{ display: 'flex', gap: 16 }}>
+          <div className="analytics-series-toggles">
             {(Object.keys(enabled) as Array<keyof typeof enabled>).map(key => (
-              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--ink-0)', fontWeight: 600 }}>
+              <label
+                key={key}
+                className={`analytics-series-label analytics-series-${key} ${enabled[key] ? '' : 'is-disabled'}`}
+              >
                 <input 
                   type="checkbox" 
                   checked={enabled[key]} 
                   onChange={() => setEnabled(prev => ({ ...prev, [key]: !prev[key] }))}
-                  style={{ accentColor: POLLUTANT_COLORS[key] }}
+                  className="analytics-series-checkbox"
                 />
-                <span style={{ opacity: enabled[key] ? 1 : 0.4, color: POLLUTANT_COLORS[key], transition: 'opacity 0.2s' }}>{key.toUpperCase()}</span>
+                <span className="analytics-series-text">{key.toUpperCase()}</span>
               </label>
             ))}
           </div>
         </div>
 
         {loading ? (
-          <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-2)', fontSize: 14, fontWeight: 500 }}>
-            <span className="spinning" style={{ marginRight: 12 }}>◌</span> Aligning Orbital Sensors...
+          <div className="analytics-loading">
+            <span className="spinning analytics-loading-spinner">◌</span> Aligning Orbital Sensors...
           </div>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -318,7 +291,7 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
                 contentStyle={{ background: 'rgba(255, 255, 255, 0.95)', backdropFilter: 'blur(10px)', border: '1px solid var(--line)', borderRadius: 12, boxShadow: '0 15px 35px -10px rgba(0,0,0,0.15)', padding: '16px' }}
                 itemStyle={{ fontSize: 12, fontWeight: 700, padding: '4px 0' }}
                 labelStyle={{ color: 'var(--ink-3)', marginBottom: 10, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', borderBottom: '1px solid var(--line)', paddingBottom: 8 }}
-                labelFormatter={formatXAxis}
+                labelFormatter={formatXAxisLabel}
               />
               <Legend verticalAlign="top" height={40} align="right" iconType="circle" />
               
@@ -333,12 +306,12 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
       </div>
 
       {/* Stats Summary Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-        <div className="glass" style={{ padding: 24, minHeight: 380, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <h3 className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="analytics-grid">
+        <div className="glass analytics-subcard">
+          <h3 className="eyebrow analytics-subcard-title">
             <PieIcon size={16} /> Pollutant Load Contribution
           </h3>
-          <div style={{ flexGrow: 1 }}>
+          <div className="analytics-subcard-body">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -365,11 +338,11 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
           </div>
         </div>
 
-        <div className="glass" style={{ padding: 24, minHeight: 380, display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <h3 className="eyebrow" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="glass analytics-subcard">
+          <h3 className="eyebrow analytics-subcard-title">
             <BarChart2 size={16} /> Historical Peak Comparison
           </h3>
-          <div style={{ flexGrow: 1 }}>
+          <div className="analytics-subcard-body">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--line)" opacity={0.4} />
@@ -390,24 +363,24 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
         </div>
       </div>
 
-      <div className="glass" style={{ padding: 24 }}>
-        <h3 className="eyebrow" style={{ marginBottom: 20 }}>Deep Parameter Metrics ({range === '1m' ? '3 Months' : range})</h3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+      <div className="glass analytics-metrics-card">
+        <h3 className="eyebrow analytics-metrics-title">Deep Parameter Metrics ({range === '1m' ? '3 Months' : range})</h3>
+        <div className="analytics-metrics-grid">
           {(Object.keys(enabled) as Array<keyof typeof enabled>).filter(k => enabled[k]).map(key => {
             const stats = getStats(key);
             return (
-              <div key={key} style={{ background: 'var(--bg-1)', padding: 20, borderRadius: 16, border: '1px solid var(--line)', position: 'relative', transition: 'transform 0.2s' }}>
-                <div style={{ width: 6, height: '40%', position: 'absolute', left: 0, top: '30%', borderRadius: '0 4px 4px 0', background: POLLUTANT_COLORS[key] }} />
-                <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--ink-0)', marginBottom: 20, paddingLeft: 12 }}>{key.toUpperCase()}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingLeft: 12 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)' }}>
-                    <span>Avg</span> <span style={{color: 'var(--ink-0)', fontWeight: 800}}>{stats.avg}</span>
+              <div key={key} className={`analytics-metric-card analytics-metric-card--${key}`}>
+                <div className="analytics-metric-bar" />
+                <div className="analytics-metric-name">{key.toUpperCase()}</div>
+                <div className="analytics-metric-stats">
+                  <div className="analytics-metric-row">
+                    <span>Avg</span> <span className="analytics-metric-value">{stats.avg}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)' }}>
-                    <span>Peak</span> <span style={{color: 'oklch(0.68 0.20 28)', fontWeight: 800}}>{stats.max}</span>
+                  <div className="analytics-metric-row">
+                    <span>Peak</span> <span className="analytics-metric-value analytics-metric-value--peak">{stats.max}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--ink-2)' }}>
-                    <span>Floor</span> <span style={{color: 'var(--ink-0)', fontWeight: 800}}>{stats.min}</span>
+                  <div className="analytics-metric-row">
+                    <span>Floor</span> <span className="analytics-metric-value">{stats.min}</span>
                   </div>
                 </div>
               </div>

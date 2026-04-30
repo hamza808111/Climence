@@ -41,21 +41,20 @@ const BAND_COLOR: Record<AqiBandKey, string> = {
   haz: '#7f3c2f',
 };
 
-type HeatPoint = [number, number, number];
-type HeatLayerOptions = {
-  radius: number;
-  blur: number;
-  maxZoom: number;
-  gradient: Record<number, string>;
-};
-type LeafletWithHeat = typeof L & {
-  heatLayer(points: HeatPoint[], options: HeatLayerOptions): L.Layer;
-};
-
 // Component to handle heatmap layer
 function HeatmapLayer({ sensors }: { sensors: LeafletMapSensor[] }) {
   const map = useMap();
   const heatLayerRef = useRef<L.Layer | null>(null);
+  type HeatLayerOptions = {
+    radius: number;
+    blur: number;
+    maxZoom: number;
+    gradient: Record<number, string>;
+  };
+  type HeatLayerFactory = (
+    points: Array<[number, number, number]>,
+    options: HeatLayerOptions,
+  ) => L.Layer;
 
   useEffect(() => {
     if (!map) return;
@@ -64,9 +63,16 @@ function HeatmapLayer({ sensors }: { sensors: LeafletMapSensor[] }) {
       map.removeLayer(heatLayerRef.current);
     }
 
-    const points: HeatPoint[] = sensors.map(s => [s.lat, s.lng, Math.min(1.0, s.aqi / 200)]);
+    const points: Array<[number, number, number]> = sensors.map(s => [
+      s.lat,
+      s.lng,
+      Math.min(1.0, s.aqi / 200),
+    ]); // [lat, lng, intensity]
     
-    heatLayerRef.current = (L as LeafletWithHeat).heatLayer(points, {
+    const heatLayerFactory = (L as typeof L & { heatLayer?: HeatLayerFactory }).heatLayer;
+    if (!heatLayerFactory) return;
+
+    heatLayerRef.current = heatLayerFactory(points, {
       radius: 40,
       blur: 25,
       maxZoom: 14,
@@ -116,14 +122,14 @@ export function RiyadhLeafletMap({ mode, sensors, clusters, onPickSensor }: Prop
   );
 
   return (
-    <div className="map" style={{ height: '100%', width: '100%', position: 'absolute', zIndex: 1 }}>
+    <div className="map leaflet-map-shell">
       <MapContainer 
         center={[RIYADH_CENTER.lat, RIYADH_CENTER.lng]} 
         zoom={11} 
         minZoom={10} 
         maxZoom={14}
         zoomControl={false}
-        style={{ height: '100%', width: '100%', background: '#efe9dd' }}
+        className="leaflet-map-root"
       >
         <TileLayer
           url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
@@ -142,8 +148,8 @@ export function RiyadhLeafletMap({ mode, sensors, clusters, onPickSensor }: Prop
             }}
           >
             <Popup>
-              <div style={{ font: '500 12px Inter, sans-serif', color: '#2f2a23' }}>
-                <div style={{ fontWeight: 700, marginBottom: '4px' }}>{sensor.label}</div>
+              <div className="leaflet-popup-sensor">
+                <div className="leaflet-popup-title">{sensor.label}</div>
                 <div>AQI {Math.round(sensor.aqi)} · PM2.5 {sensor.pm25.toFixed(1)}</div>
               </div>
             </Popup>

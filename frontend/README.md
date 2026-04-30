@@ -35,14 +35,33 @@ src/
 │   └── client.ts                 # REST wrappers (login, history, alert config)
 ├── components/
 │   ├── map/                      # Google Map + AQI heatmap + sensor markers
-│   ├── panels/                   # side-rail cards (city trend, hotspots, etc.)
+│   ├── panels/                   # side-rail cards + Analytics + LiveMapView
 │   └── ReportModal.tsx           # FR-15/16 — CSV/JSON/print-to-PDF export
 └── lib/
     ├── analytics.ts              # trend detection, forecast, wind vector, source heuristic
+    ├── liveMap.ts                # clustering/filter/playback/preset helpers
     ├── reports.ts                # export builders
     ├── i18n.ts                   # EN/AR dictionary + translate()
     └── auth-session.ts           # localStorage session management
 ```
+
+## Live Map tab
+
+The `Live Map` tab is a dedicated operations view built on top of the same
+WebSocket snapshot feed used by overview:
+
+- **Clustering**: nearby sensors are aggregated into dynamic map clusters.
+- **Playback scrubber**: replay recent snapshot frames with play/pause controls.
+- **Filter chips**: status (all/online/offline), PM2.5 threshold, and low-battery filter.
+- **Saved presets**: persist named camera views (`lat/lng/zoom`) to local storage.
+- **Legend overlay**: quick visual reference for AQI severity and cluster totals.
+
+Primary files:
+
+- `src/components/panels/LiveMapView.tsx`
+- `src/lib/liveMap.ts`
+- `src/components/map/RiyadhGoogleMap.tsx`
+- `test/liveMap.test.ts`
 
 ## Data flow
 
@@ -76,6 +95,7 @@ All Vite env vars must start with `VITE_`.
 ## Where to extend
 
 - **New panel** → add to `components/panels/*`, render in `App.tsx` inside `<aside className="side">`, follow the `.side-group`/`.side-head`/`.side-title` pattern.
+- **New live-map operation** → prefer pure helpers in `lib/liveMap.ts`, then wire UI in `components/panels/LiveMapView.tsx`.
 - **New analytic** → add a pure function to `lib/analytics.ts`, memoize in `App.tsx`.
 - **New translation** → add an entry to `DICT` in `lib/i18n.ts` (both `en` and `ar`).
 - **New report format** → add an exporter to `lib/reports.ts` and a card to `components/ReportModal.tsx`.

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { AuthUser } from '@climence/shared';
-import { login } from '../api/client';
+import { ApiError, login } from '../api/client';
 import { saveAuthSession } from '../lib/auth-session';
 import climenceLogo from '../assets/climence-logo.png';
 
@@ -33,8 +33,19 @@ export function AuthScreen({ onLogin }: AuthScreenProps) {
         saveAuthSession(session);
         onLogin(session);
       })
-      .catch(() => {
-        setError('Incorrect email or password.');
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          if (err.status === 429) {
+            const waitHint = err.retryAfterSec ? ` (${Math.ceil(err.retryAfterSec / 60)} min)` : '';
+            setError(`Too many failed attempts. Try again later${waitHint}.`);
+          } else if (err.status === 401) {
+            setError('Incorrect email or password.');
+          } else {
+            setError(`Login failed: ${err.message}`);
+          }
+        } else {
+          setError('Cannot reach backend. Make sure API is running and port matches shared constants.');
+        }
         setState('error');
       });
   }, [email, password, onLogin]);

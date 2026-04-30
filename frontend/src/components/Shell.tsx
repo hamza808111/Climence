@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   BarChart3,
   Bell,
@@ -46,8 +46,8 @@ export interface ShellProps {
   children: ReactNode;
   /** Everything rendered inside the side rail (<aside>). */
   sideContent: ReactNode;
-  currentTab: 'overview' | 'analytics';
-  onTabChange: (tab: 'overview' | 'analytics') => void;
+  currentTab: 'overview' | 'livemap' | 'analytics';
+  onTabChange: (tab: 'overview' | 'livemap' | 'analytics') => void;
 }
 
 export function Shell({
@@ -70,6 +70,16 @@ export function Shell({
   const t = (key: DictKey) => translate(key, locale);
   const statusMeta = STATUS_META[status];
   const [navOpen, setNavOpen] = useState(false);
+  const [navCollapsed, setNavCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('climence.nav-collapsed') === '1';
+  });
+  const hasSideContent = sideContent !== null;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('climence.nav-collapsed', navCollapsed ? '1' : '0');
+  }, [navCollapsed]);
 
   const userInitials = authUser.name
     .split(' ')
@@ -85,8 +95,16 @@ export function Shell({
         ? 'Analyst'
         : 'Viewer';
 
+  const handleNavToggle = () => {
+    if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
+      setNavOpen(true);
+      return;
+    }
+    setNavCollapsed(prev => !prev);
+  };
+
   return (
-    <div className="app">
+  <div className={`app ${hasSideContent ? '' : 'app--no-side'} ${navCollapsed ? 'app--nav-collapsed' : ''}`}>
       {/* ─── Mobile hamburger overlay ─── */}
       {navOpen && (
         <div
@@ -120,63 +138,69 @@ export function Shell({
           <button 
             className={`nav-item ${currentTab === 'overview' ? 'active' : ''}`}
             onClick={() => onTabChange('overview')}
+            title={t('nav.overview')}
           >
             <Home size={16} />
-            {t('nav.overview')}
+            <span className="nav-label">{t('nav.overview')}</span>
           </button>
-          <button className="nav-item">
+          <button
+            className={`nav-item ${currentTab === 'livemap' ? 'active' : ''}`}
+            onClick={() => onTabChange('livemap')}
+            title={t('nav.livemap')}
+          >
             <MapIcon size={16} />
-            {t('nav.livemap')}
+            <span className="nav-label">{t('nav.livemap')}</span>
           </button>
           <button 
             className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`}
             onClick={() => onTabChange('analytics')}
+            title={t('nav.analytics')}
           >
             <BarChart3 size={16} />
-            {t('nav.analytics')}
+            <span className="nav-label">{t('nav.analytics')}</span>
           </button>
-          <button className="nav-item">
+          <button className="nav-item" title={t('nav.alerts')}>
             <Siren size={16} />
-            {t('nav.alerts')}
+            <span className="nav-label">{t('nav.alerts')}</span>
             <span className="count tnum">{feedCount}</span>
           </button>
         </div>
 
         <div className="nav-section">
           <div className="nav-section-title">{t('nav.operate')}</div>
-          <button className="nav-item">
+          <button className="nav-item" title={t('nav.sensors')}>
             <Cpu size={16} />
-            {t('nav.sensors')}
+            <span className="nav-label">{t('nav.sensors')}</span>
             <span className="count tnum">
               {onlineSensors}/{totalSensors || 0}
             </span>
           </button>
-          <button className="nav-item">
+          <button className="nav-item" title={t('nav.dispatch')}>
             <Users size={16} />
-            {t('nav.dispatch')}
+            <span className="nav-label">{t('nav.dispatch')}</span>
           </button>
-          <button className="nav-item" onClick={onOpenReportModal}>
+          <button className="nav-item" onClick={onOpenReportModal} title={t('nav.reports')}>
             <FileText size={16} />
-            {t('nav.reports')}
+            <span className="nav-label">{t('nav.reports')}</span>
           </button>
         </div>
 
         <div className="nav-section">
           <div className="nav-section-title">{t('nav.system')}</div>
-          <button className="nav-item">
+          <button className="nav-item" title={t('nav.integrations')}>
             <Layers size={16} />
-            {t('nav.integrations')}
+            <span className="nav-label">{t('nav.integrations')}</span>
           </button>
-          <button className="nav-item">
+          <button className="nav-item" title={t('nav.settings')}>
             <Settings size={16} />
-            {t('nav.settings')}
+            <span className="nav-label">{t('nav.settings')}</span>
           </button>
         </div>
 
         <div className="nav-footer">
           <div className="user-chip">
             <div className="avatar">{userInitials || 'U'}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="user-chip-meta">
               <div className="user-name">{authUser.name}</div>
               <div className="user-role">{roleLabel} · Riyadh</div>
             </div>
@@ -189,8 +213,8 @@ export function Shell({
         {/* Hamburger toggle — visible only ≤ 1024px */}
         <button
           className="icon-btn hamburger-btn"
-          onClick={() => setNavOpen(true)}
-          aria-label="Open navigation"
+          onClick={handleNavToggle}
+          aria-label="Toggle navigation"
         >
           <Menu size={16} />
         </button>
@@ -235,13 +259,11 @@ export function Shell({
         </button>
       </header>
 
-      <main className="main">
+      <main className={`main ${currentTab === 'overview' ? '' : 'main--single'}`}>
         {children}
       </main>
 
-      <aside className="side">
-        {sideContent}
-      </aside>
+      {hasSideContent && <aside className="side">{sideContent}</aside>}
     </div>
   );
 }
