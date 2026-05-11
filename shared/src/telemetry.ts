@@ -59,6 +59,7 @@ export interface CityTrendPoint {
   minute_label: string;
   avg_pm25: number;
   avg_co2: number;
+  avg_no2?: number;
 }
 
 export interface Hotspot {

@@ -72,12 +72,13 @@ export const getHistory = (droneId: string): TelemetryRecord[] =>
 
 const cityTrendStmt = db.prepare(`
   SELECT
-    strftime('%H:%M', server_timestamp) as minute_label,
+    strftime('%H:%M:%S', server_timestamp) as minute_label,
     AVG(pm25) as avg_pm25,
-    AVG(co2) as avg_co2
+    AVG(co2) as avg_co2,
+    AVG(no2) as avg_no2
   FROM TelemetryLogs
-  WHERE server_timestamp >= datetime('now', '-30 minutes')
-  GROUP BY strftime('%Y-%m-%d %H:%M', server_timestamp)
+  WHERE server_timestamp >= datetime('now', '-60 minutes')
+  GROUP BY strftime('%Y-%m-%d %H:%M:%S', server_timestamp)
   ORDER BY server_timestamp ASC
 `);
 

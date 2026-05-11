@@ -105,6 +105,7 @@ const MOCK_ALERTS: TelemetryRecord[] = MOCK_DRONES.filter(
 
 const pm25BaseSeries = genSeries(42, 40, 120, 35);
 const co2BaseSeries  = genSeries(99, 40, 580, 80);
+const no2BaseSeries  = genSeries(17, 40, 45, 15);
 
 const MOCK_CITY_TREND: CityTrendPoint[] = pm25BaseSeries.map((pm25, i) => {
   const dt = new Date(Date.now() - (40 - i) * 30 * 60 * 1000);
@@ -112,6 +113,7 @@ const MOCK_CITY_TREND: CityTrendPoint[] = pm25BaseSeries.map((pm25, i) => {
     minute_label: dt.toISOString(),
     avg_pm25: Math.round(pm25),
     avg_co2: Math.round(co2BaseSeries[i] ?? 580),
+    avg_no2: Math.round(no2BaseSeries[i] ?? 45),
   };
 });
 

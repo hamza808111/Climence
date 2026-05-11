@@ -16,25 +16,30 @@ import {
   Wind,
 } from 'lucide-react';
 
-const KPI_CARDS = [
-  { label: 'City AQI', value: '167', meta: 'Unhealthy', tone: 'hazard', icon: Activity },
-  { label: 'PM2.5', value: '128', meta: 'µg/m³ · Rising', tone: 'warn', icon: Gauge },
-  { label: 'Active Alerts', value: '5', meta: '3 critical', tone: 'alert', icon: Siren },
-  { label: 'Sensors Online', value: '25/25', meta: '100% coverage', tone: 'good', icon: Cpu },
-  { label: 'Wind', value: '18', meta: 'km/h · NW', tone: 'neutral', icon: Wind },
-];
+import { aqiBandFor } from '@climence/shared';
+import type { useDashboardData } from '../hooks/useDashboardData';
 
-const HOTSPOTS = [
-  { id: 'H1', name: 'Industrial Corridor', pm25: 182, trend: '+14%', tone: 'hazard' },
-  { id: 'H2', name: 'East Logistics Belt', pm25: 164, trend: '+9%', tone: 'warn' },
-  { id: 'H3', name: 'Old City Center', pm25: 151, trend: '+4%', tone: 'warn' },
-  { id: 'H4', name: 'Airport Loop', pm25: 132, trend: '-2%', tone: 'moderate' },
-  { id: 'H5', name: 'North Residential', pm25: 96, trend: '-6%', tone: 'good' },
-];
+const SENSOR_FILTERS = ['PM2.5', 'PM10', 'NO2', 'CO2'];
 
-const SENSOR_FILTERS = ['PM2.5', 'CO₂', 'NO₂', 'Temp', 'Humidity', 'Battery'];
+type DashboardData = ReturnType<typeof useDashboardData>;
 
-export function CommandCenterRedesign() {
+export function CommandCenterRedesign({ data }: { data: DashboardData }) {
+  const KPI_CARDS = [
+    { label: 'City AQI', value: data.cityAqi.toString(), meta: aqiBandFor(data.cityAqi).label, tone: data.cityBand === 'haz' || data.cityBand === 'vunh' ? 'hazard' : data.cityBand === 'unh' ? 'warn' : 'good', icon: Activity },
+    { label: 'PM2.5', value: data.pm25Now.toString(), meta: `µg/m³ · ${data.trendLabel}`, tone: data.cityBand === 'haz' || data.cityBand === 'vunh' ? 'hazard' : data.cityBand === 'unh' ? 'warn' : 'good', icon: Gauge },
+    { label: 'Active Alerts', value: data.feed.length.toString(), meta: `${data.feed.filter(a => a.severity === 'crit').length} critical`, tone: data.feed.length > 0 ? 'alert' : 'good', icon: Siren },
+    { label: 'Sensors Online', value: `${data.onlineSensors}/${data.sensors.length}`, meta: '100% coverage', tone: data.onlineSensors === data.sensors.length ? 'good' : 'warn', icon: Cpu },
+    { label: 'Wind', value: data.drift.speedKmh.toString(), meta: `km/h · ${data.drift.cardinal}`, tone: 'neutral', icon: Wind },
+  ];
+
+  const HOTSPOTS = data.hotspots.slice(0, 5).map(spot => ({
+    id: spot.id,
+    name: spot.name,
+    pm25: spot.metricValue,
+    trend: `${spot.trend > 0 ? '+' : ''}${spot.trend}%`,
+    tone: spot.band === 'haz' || spot.band === 'vunh' ? 'hazard' : spot.band === 'unh' || spot.band === 'usg' ? 'warn' : 'good'
+  }));
+
   return (
     <div className="cc-theme min-h-screen bg-[var(--cc-bg)] text-[var(--cc-text)]">
       <div className="cc-shell grid min-h-screen grid-cols-[260px_minmax(0,1fr)_320px]">
@@ -58,7 +63,7 @@ export function CommandCenterRedesign() {
               <button className="cc-nav-item">Analytics</button>
               <button className="cc-nav-item">
                 <span>Alerts</span>
-                <span className="cc-nav-badge">5</span>
+                <span className="cc-nav-badge">{data.feed.length}</span>
               </button>
             </div>
 
@@ -106,7 +111,7 @@ export function CommandCenterRedesign() {
                 </div>
                 <button className="cc-icon-btn" aria-label="Notifications">
                   <Bell size={16} />
-                  <span className="cc-icon-badge">5</span>
+                  <span className="cc-icon-badge">{data.feed.length}</span>
                 </button>
                 <button className="cc-primary-btn">Export report</button>
                 <button className="cc-ghost-btn">Sign out</button>
@@ -231,8 +236,8 @@ export function CommandCenterRedesign() {
               <span className="cc-pill cc-pill--alert">Critical</span>
             </div>
             <div className="cc-card-body">
-              <div className="cc-threshold-value">180 µg/m³</div>
-              <div className="cc-threshold-meta">Current alerts are 22% above baseline</div>
+              <div className="cc-threshold-value">{data.effectiveAlertThreshold} µg/m³</div>
+              <div className="cc-threshold-meta">Current alerts are {data.thresholdExceededBy > 0 ? `${data.thresholdExceededBy} µg/m³ above` : 'below'} baseline</div>
               <div className="cc-threshold-actions">
                 <button className="cc-secondary-btn">Edit Threshold</button>
                 <button className="cc-primary-btn">Dispatch</button>
@@ -246,15 +251,15 @@ export function CommandCenterRedesign() {
                 <div className="cc-card-eyebrow">PM2.5 trend</div>
                 <div className="cc-card-title">Last 30 minutes</div>
               </div>
-              <span className="cc-pill cc-pill--warn">Worsening</span>
+              <span className={`cc-pill cc-pill--${data.trend.direction === 'worsening' ? 'warn' : 'good'}`}>{data.trendLabel}</span>
             </div>
             <div className="cc-chart">
               <div className="cc-chart-grid" />
               <div className="cc-chart-line" />
             </div>
             <div className="cc-chart-meta">
-              <span>Avg 146 µg/m³</span>
-              <span>Peak 182 µg/m³</span>
+              <span>Avg {Math.round(data.pm25Series.reduce((a, b) => a + b, 0) / Math.max(1, data.pm25Series.length))} µg/m³</span>
+              <span>Peak {Math.round(Math.max(...data.pm25Series))} µg/m³</span>
             </div>
           </div>
 
@@ -285,8 +290,8 @@ export function CommandCenterRedesign() {
           <div className="cc-alert-strip">
             <ShieldAlert size={16} />
             <div>
-              <div className="cc-alert-title">3 critical incidents</div>
-              <div className="cc-alert-meta">North grid · Industrial corridor</div>
+              <div className="cc-alert-title">{data.feed.filter(a => a.severity === 'crit').length} critical incidents</div>
+              <div className="cc-alert-meta">{data.feed.length > 0 ? data.feed[0].meta : 'No recent incidents'}</div>
             </div>
           </div>
         </aside>

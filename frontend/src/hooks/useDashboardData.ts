@@ -38,7 +38,7 @@ import type { ConnectionStatus } from './useLiveTelemetry';
 /* ═══════════════════════════ TYPES ═══════════════════════════ */
 
 export type ViewMode = 'hardware' | 'heatmap';
-export type TimeRange = '1h' | '24h' | '7d' | '30d';
+export type TimeRange = '1s' | '15m' | '30m' | '1h';
 export type PollutantKey = MapMetricKey;
 type AqiBandKey = (typeof AQI_BANDS)[number]['key'];
 export type AlertSeverity = 'crit' | 'warn' | 'info' | 'ok';
@@ -103,11 +103,11 @@ export interface FeedItem {
 
 /* ═══════════════════════════ CONSTANTS ═══════════════════════════ */
 
-const RANGE_POINTS: Record<TimeRange, number> = {
-  '1h': 20,
-  '24h': 48,
-  '7d': 84,
-  '30d': 120,
+const RANGE_SECONDS: Record<TimeRange, number> = {
+  '1s': 60,
+  '15m': 900,
+  '30m': 1800,
+  '1h': 3600,
 };
 
 /* ═══════════════════════════ PURE HELPERS ═══════════════════════════ */
@@ -296,12 +296,12 @@ export function useDashboardData(
 
   const [mode, setMode] = useState<ViewMode>('heatmap');
   const [pollutant, setPollutant] = useState<PollutantKey>('pm25');
-  const [range, setRange] = useState<TimeRange>('24h');
+  const [range, setRange] = useState<TimeRange>('15m');
   const [selected, setSelected] = useState<HotspotCard | null>(null);
   const [mapBounds, setMapBounds] = useState<RiyadhMapBounds | null>(null);
   const [mapZoom, setMapZoom] = useState(11);
   const [zoomPreset, setZoomPreset] = useState<RiyadhZoomPreset>('city');
-  const [currentTab, setCurrentTab] = useState<'overview' | 'livemap' | 'analytics'>('overview');
+  const [currentTab, setCurrentTab] = useState<'overview' | 'livemap' | 'analytics' | 'alerts'>('overview');
   const [mapFocusTarget, setMapFocusTarget] = useState<{ lat: number; lng: number; zoom?: number; nonce: number } | null>(null);
   const [historySeries, setHistorySeries] = useState<number[]>([]);
   const [historySourceUuid, setHistorySourceUuid] = useState<string | null>(null);
@@ -372,10 +372,48 @@ export function useDashboardData(
     return () => { cancelled = true; };
   }, [authToken, selectedHotspot]);
 
-  const basePm25Series = useMemo(() => { const raw = snapshot.cityTrend.map(p => p.avg_pm25); if (raw.length > 1) return raw; return seededSeries(17, 40, average(sensors.slice(0, 12).map(s => s.pm25)) || 85, 24); }, [snapshot.cityTrend, sensors]);
-  const pm25Series = useMemo(() => resampleSeries(basePm25Series.map(v => pm25ToAqi(v)), RANGE_POINTS[range]), [basePm25Series, range]);
+  const basePm25Series = useMemo(() => { 
+    const raw = snapshot.cityTrend.map(p => p.avg_pm25); 
+    if (raw.length > 1) {
+      return raw.slice(-RANGE_SECONDS[range]);
+    }
+    return seededSeries(17, 40, average(sensors.slice(0, 12).map(s => s.pm25)) || 85, 24); 
+  }, [snapshot.cityTrend, sensors, range]);
+  
+  const pm25Series = useMemo(() => {
+    const aqiSeries = basePm25Series.map(v => pm25ToAqi(v));
+    const targetPoints = Math.min(aqiSeries.length, 120);
+    return resampleSeries(aqiSeries, targetPoints);
+  }, [basePm25Series]);
+  const baseNo2Series = useMemo(() => {
+    const raw = snapshot.cityTrend.map(p => p.avg_no2 ?? 40);
+    if (raw.length > 1) {
+      return raw.slice(-RANGE_SECONDS[range]);
+    }
+    return seededSeries(25, 40, average(sensors.slice(0, 12).map(s => s.no2)) || 45, 10);
+  }, [snapshot.cityTrend, sensors, range]);
+
+  const baseCo2Series = useMemo(() => {
+    const raw = snapshot.cityTrend.map(p => p.avg_co2 ?? 400);
+    if (raw.length > 1) {
+      return raw.slice(-RANGE_SECONDS[range]);
+    }
+    return seededSeries(33, 40, average(sensors.slice(0, 12).map(s => s.co2)) || 400, 30);
+  }, [snapshot.cityTrend, sensors, range]);
+
   const pm10Series = useMemo(() => pm25Series.map(v => clamp(v * 1.18, 18, 260)), [pm25Series]);
-  const no2Series = useMemo(() => pm25Series.map(v => clamp(v * 0.68 + 22, 8, 180)), [pm25Series]);
+  
+  const no2Series = useMemo(() => {
+    const targetPoints = Math.min(baseNo2Series.length, 120);
+    return resampleSeries(baseNo2Series, targetPoints);
+  }, [baseNo2Series]);
+
+  const co2Series = useMemo(() => {
+    const targetPoints = Math.min(baseCo2Series.length, 120);
+    const scaled = resampleSeries(baseCo2Series, targetPoints);
+    // Scale CO2 so it visually fits in the 0-220 chart scale (e.g. 400->40, 600->120)
+    return scaled.map(v => clamp((v - 300) * 0.4, 0, 220));
+  }, [baseCo2Series]);
 
   const trend = useMemo(() => detectTrend(pm25Series), [pm25Series]);
   const forecast = useMemo(() => computeForecast(pm25Series, 6), [pm25Series]);
@@ -480,7 +518,7 @@ export function useDashboardData(
     mapHeatmapPoints, mapHotspots, zoomPreset, setZoomPreset, mapFocusTarget, mapBounds, mapZoom,
     handlePickSensor, handleMapViewportChange, handlePickHotspot,
     // trend / forecast / sources
-    pm25Series, pm10Series, no2Series, trend, trendLabel, forecast, sources, drift,
+    pm25Series, pm10Series, no2Series, co2Series, trend, trendLabel, forecast, sources, drift,
     // city
     cityAqi, cityBand, pm25Now, co2Now, no2Now, tempNow, humidityNow, batteryNow, currentDelta,
     // pollutants
@@ -494,3 +532,5 @@ export function useDashboardData(
     liveAge, status, t, reportPayload,
   };
 }
+
+export type DashboardData = ReturnType<typeof useDashboardData>;

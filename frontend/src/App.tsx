@@ -18,6 +18,7 @@ import { Dashboard } from './components/Dashboard';
 import { ReportModal } from './components/ReportModal';
 import { AnalyticsView } from './components/panels/AnalyticsView';
 import { LiveMapView } from './components/panels/LiveMapView';
+import { AlertsView } from './components/panels/AlertsView';
 
 export type DataSource = 'live' | 'demo';
 const DS_KEY = 'climence.data-source';
@@ -135,6 +136,7 @@ export default function App() {
         {data.currentTab === 'overview' && <Dashboard data={data} position="main" />}
         {data.currentTab === 'livemap' && <LiveMapView data={data} />}
         {data.currentTab === 'analytics' && <AnalyticsView authToken={authToken} />}
+        {data.currentTab === 'alerts' && <AlertsView data={data} />}
       </Shell>
 
       <ReportModal

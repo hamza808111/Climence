@@ -70,11 +70,13 @@ function CityTrendChart({
   pm25Series,
   pm10Series,
   no2Series,
+  co2Series,
   range,
 }: {
   pm25Series: number[];
   pm10Series: number[];
   no2Series: number[];
+  co2Series: number[];
   range: TimeRange;
 }) {
   const width = 340;
@@ -88,14 +90,15 @@ function CityTrendChart({
   const xAt = (i: number, total: number) => pad.l + (i / Math.max(1, total - 1)) * innerW;
   const yAt = (v: number) => pad.t + innerH - (clamp(v, 0, max) / max) * innerH;
 
-  const labels = range === '1h' ? ['14:00', '14:15', '14:30', '14:45', '15:00']
-    : range === '24h' ? ['00', '06', '12', '18', '24']
-    : range === '7d' ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    : ['W1', 'W2', 'W3', 'W4'];
+  const labels = range === '1s' ? ['-60s', '-45s', '-30s', '-15s', 'Now']
+    : range === '15m' ? ['-15m', '-10m', '-5m', 'Now']
+    : range === '30m' ? ['-30m', '-20m', '-10m', 'Now']
+    : ['-60m', '-40m', '-20m', 'Now'];
 
   const pm25Path = makePath(pm25Series, width, height, pad, max);
   const pm10Path = makePath(pm10Series, width, height, pad, max);
   const no2Path = makePath(no2Series, width, height, pad, max);
+  const co2Path = makePath(co2Series, width, height, pad, max);
 
   return (
     <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ height: 210 }}>
@@ -115,6 +118,7 @@ function CityTrendChart({
       <text className="chart-label" x={width - pad.r - 3} y={yAt(100) - 3} textAnchor="end" fill="var(--brand)">Alert</text>
       <path d={`${pm25Path} L ${xAt(pm25Series.length - 1, pm25Series.length)} ${yAt(0)} L ${xAt(0, pm25Series.length)} ${yAt(0)} Z`} fill="url(#area-pm25)" />
       <path d={no2Path} fill="none" stroke="oklch(0.85 0.16 95)" strokeWidth="1.5" opacity="0.86" />
+      <path d={co2Path} fill="none" stroke="oklch(0.65 0.18 140)" strokeWidth="1.5" opacity="0.86" />
       <path d={pm10Path} fill="none" stroke="oklch(0.78 0.17 60)" strokeWidth="1.5" opacity="0.86" />
       <path d={pm25Path} fill="none" stroke="oklch(0.68 0.20 28)" strokeWidth="1.8" />
       <circle cx={xAt(pm25Series.length - 1, pm25Series.length)} cy={yAt(pm25Series[pm25Series.length - 1] ?? 0)} r="3.5" fill="oklch(0.68 0.20 28)" stroke="var(--bg-0)" strokeWidth="1.5" />
@@ -322,24 +326,6 @@ function SideContent({ d }: { d: DashboardData }) {
         <button className="banner-cta">{d.t('banner.dispatch')}</button>
       </div>
 
-      {/* Alert Settings */}
-      <div className="side-group">
-        <div className="side-head"><div><div className="eyebrow">UC-A4</div><div className="side-title">{d.t('panel.alertSettings')}</div></div></div>
-        {d.canManageAlertSettings ? (
-          <div style={{ display: 'grid', gap: 10 }}>
-            <label className="eyebrow" htmlFor="pm25-threshold-input" style={{ fontSize: 10 }}>PM2.5 threshold (ug/m3)</label>
-            <div className="row-flex gap-tight" style={{ alignItems: 'center' }}>
-              <input id="pm25-threshold-input" type="number" min={1} max={500} step={0.1} value={d.alertThresholdDraft} onChange={e => { d.setAlertThresholdDraft(e.target.value); d.setAlertConfigState('idle'); }} style={{ flex: 1, minWidth: 0, border: '1px solid var(--line)', borderRadius: 8, background: 'var(--bg-1)', color: 'var(--ink-1)', padding: '8px 10px' }} />
-              <button className="btn primary" disabled={d.alertConfigState === 'saving'} onClick={d.handleSaveAlertThreshold}>{d.alertConfigState === 'saving' ? 'Saving...' : 'Save'}</button>
-            </div>
-            <div className="mono tnum" style={{ fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Active threshold: {d.effectiveAlertThreshold}</div>
-            {d.alertConfigState === 'saved' && <div style={{ fontSize: 11.5, color: 'var(--ok)' }}>Threshold saved and applied to live alerts.</div>}
-            {d.alertConfigState === 'error' && <div style={{ fontSize: 11.5, color: 'var(--danger)' }}>Failed to save threshold. Enter a value between 1 and 500.</div>}
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: 'var(--ink-2)' }}>You have read-only access. Only administrators can change alert thresholds.</div>
-        )}
-      </div>
 
       {/* City Trend */}
       <div className="side-group">
@@ -356,15 +342,16 @@ function SideContent({ d }: { d: DashboardData }) {
             </div>
           </div>
           <div className="range-picker">
-            {(['1h', '24h', '7d', '30d'] as TimeRange[]).map(v => (<button key={v} className={d.range === v ? 'active' : ''} onClick={() => d.setRange(v)}>{v}</button>))}
+            {(['1s', '15m', '30m', '1h'] as TimeRange[]).map(v => (<button key={v} className={d.range === v ? 'active' : ''} onClick={() => d.setRange(v)}>{v === '1s' ? 'second' : v === '15m' ? '15 min' : v === '30m' ? '30 min' : '1 hour'}</button>))}
           </div>
         </div>
-        <div className="chart-wrap"><CityTrendChart pm25Series={d.pm25Series} pm10Series={d.pm10Series} no2Series={d.no2Series} range={d.range} /></div>
+        <div className="chart-wrap"><CityTrendChart pm25Series={d.pm25Series} pm10Series={d.pm10Series} no2Series={d.no2Series} co2Series={d.co2Series} range={d.range} /></div>
         <div className="row-between" style={{ marginTop: 8, fontSize: 11.5, color: 'var(--ink-2)' }}>
           <div className="row-flex gap-tight">
             <span className="row-flex gap-tight"><span style={{ width: 10, height: 2, background: 'oklch(0.68 0.20 28)' }} /> PM2.5</span>
             <span className="row-flex gap-tight" style={{ marginLeft: 8 }}><span style={{ width: 10, height: 2, background: 'oklch(0.78 0.17 60)' }} /> PM10</span>
             <span className="row-flex gap-tight" style={{ marginLeft: 8 }}><span style={{ width: 10, height: 2, background: 'oklch(0.85 0.16 95)' }} /> NO2</span>
+            <span className="row-flex gap-tight" style={{ marginLeft: 8 }}><span style={{ width: 10, height: 2, background: 'oklch(0.65 0.18 140)' }} /> CO2</span>
           </div>
           <span className="mono tnum" style={{ color: 'var(--ink-3)', fontSize: 10.5 }}>updated {d.liveAge} ago</span>
         </div>

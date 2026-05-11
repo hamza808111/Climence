@@ -49,8 +49,8 @@ export interface ShellProps {
   children: ReactNode;
   /** Everything rendered inside the side rail (<aside>). */
   sideContent: ReactNode;
-  currentTab: 'overview' | 'livemap' | 'analytics';
-  onTabChange: (tab: 'overview' | 'livemap' | 'analytics') => void;
+  currentTab: 'overview' | 'livemap' | 'analytics' | 'alerts';
+  onTabChange: (tab: 'overview' | 'livemap' | 'analytics' | 'alerts') => void;
   /** Current data source mode. */
   dataSource: DataSource;
   /** Callback to toggle between live and demo. */
@@ -168,7 +168,11 @@ export function Shell({
             <BarChart3 size={16} />
             <span className="nav-label">{t('nav.analytics')}</span>
           </button>
-          <button className="nav-item" title={t('nav.alerts')}>
+          <button 
+            className={`nav-item ${currentTab === 'alerts' ? 'active' : ''}`}
+            onClick={() => onTabChange('alerts')}
+            title={t('nav.alerts')}
+          >
             <Siren size={16} />
             <span className="nav-label">{t('nav.alerts')}</span>
             <span className="count tnum">{feedCount}</span>
