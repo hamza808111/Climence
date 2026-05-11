@@ -54,6 +54,27 @@ export async function fetchHistoryByZone(
   return res.json() as Promise<{ label: string; value: number }[]>;
 }
 
+export interface OpenMeteoHistoryPoint {
+  label: string;
+  pm25: number;
+  pm10: number;
+  co2: number;
+  no2: number;
+  dust: number;
+}
+
+export async function fetchOpenMeteoHistory(
+  range: string,
+  token?: string
+): Promise<OpenMeteoHistoryPoint[]> {
+  const params = new URLSearchParams({ range });
+  const res = await fetch(`${API_BASE_URL}/api/analytics/openmeteo-history?${params.toString()}`, {
+    headers: withAuth(token),
+  });
+  if (!res.ok) throw new Error(`GET openmeteo-history failed: ${res.status}`);
+  return res.json() as Promise<OpenMeteoHistoryPoint[]>;
+}
+
 export async function fetchForecast(hours: number, token?: string) {
   const res = await fetch(`${API_BASE_URL}/api/analytics/forecast?hours=${hours}`, {
     headers: withAuth(token),

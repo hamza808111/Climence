@@ -1,11 +1,11 @@
 /* eslint-disable */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, LineChart, Line, Legend, 
   PieChart, Pie, Cell, BarChart, Bar 
 } from 'recharts';
-import { Download, Maximize2, PieChart as PieIcon, BarChart2, Clock } from 'lucide-react';
-import { fetchHistoryByZone, fetchForecast } from '../../api/client';
+import { Download, Maximize2, PieChart as PieIcon, BarChart2, Clock, RefreshCw } from 'lucide-react';
+import { fetchHistoryByZone, fetchOpenMeteoHistory, fetchForecast } from '../../api/client';
 import type { ForecastPoint } from '@climence/shared';
 
 interface AnalyticsViewProps {
@@ -15,13 +15,18 @@ interface AnalyticsViewProps {
 const RANGES = ['1h', '6h', '12h', '24h', '3d', '1m'] as const;
 type TimeRange = typeof RANGES[number];
 
-const RANGE_TO_DB = {
-  '1h': '1h',
-  '6h': '24h', 
-  '12h': '24h',
+// Ranges that use Open-Meteo historical data (hourly granularity, 92 days back)
+// '1h' uses the live SQLite DB (per-minute granularity, auto-refreshed every 30s)
+const USE_OPEN_METEO = new Set<TimeRange>(['6h', '12h', '24h', '3d', '1m']);
+
+// Map UI label → backend range key for Open-Meteo endpoint
+const OM_RANGE: Record<TimeRange, string> = {
+  '1h':  '1h',   // unused — SQLite path
+  '6h':  '6h',
+  '12h': '12h',
   '24h': '24h',
-  '3d': '7d',
-  '1m': '90d' // Extended to 3 months (90 days)
+  '3d':  '3d',
+  '1m':  '30d',
 };
 
 const FORECAST_HORIZONS = [
@@ -35,8 +40,8 @@ const FORECAST_HORIZONS = [
 const POLLUTANT_COLORS = {
   pm25: 'var(--brand)',
   pm10: 'oklch(0.78 0.17 60)',
-  co2: 'oklch(0.68 0.20 28)',
-  no2: 'oklch(0.60 0.14 250)',
+  co2:  'oklch(0.68 0.20 28)',
+  no2:  'oklch(0.60 0.14 250)',
   dust: 'oklch(0.85 0.15 80)',
 };
 
@@ -44,79 +49,85 @@ interface AnalyticsPoint {
   time: string;
   pm25: number;
   pm10: number;
-  co2: number;
-  no2: number;
+  co2:  number;
+  no2:  number;
   dust: number;
   isForecast: boolean;
 }
 
+// Auto-refresh interval for the live 1h chart (ms)
+const LIVE_REFRESH_MS = 30_000;
+
 export function AnalyticsView({ authToken }: AnalyticsViewProps) {
-  const [range, setRange] = useState<TimeRange>('24h');
+  const [range, setRange]               = useState<TimeRange>('24h');
   const [showForecast, setShowForecast] = useState(false);
   const [forecastHorizon, setForecastHorizon] = useState<number>(24);
-  const [loading, setLoading] = useState(true);
-  
+  const [loading, setLoading]           = useState(true);
+  const [lastRefresh, setLastRefresh]   = useState<Date>(new Date());
+
   const [enabled, setEnabled] = useState({
-    pm25: true,
-    pm10: true,
-    co2: true,
-    no2: true,
-    dust: true,
+    pm25: true, pm10: true, co2: true, no2: true, dust: true,
   });
 
-  const [historyData, setHistoryData] = useState<AnalyticsPoint[]>([]);
+  const [historyData, setHistoryData]   = useState<AnalyticsPoint[]>([]);
   const [forecastData, setForecastData] = useState<ForecastPoint[]>([]);
 
-  useEffect(() => {
+  const loadData = useCallback(async (silent = false) => {
     if (!authToken) return;
-    let cancelled = false;
-    setLoading(true);
+    if (!silent) setLoading(true);
 
-    const loadData = async () => {
-      try {
-        const dbRange = RANGE_TO_DB[range];
+    try {
+      let merged: AnalyticsPoint[] = [];
+
+      if (USE_OPEN_METEO.has(range)) {
+        // ── Historical path: Open-Meteo (hourly, 92 days) ──
+        const rows = await fetchOpenMeteoHistory(OM_RANGE[range], authToken);
+        merged = rows.map(r => ({ ...r, time: r.label, isForecast: false }));
+      } else {
+        // ── Live path: SQLite per-minute data (1h only) ──
         const [pm25, co2, no2] = await Promise.all([
-          fetchHistoryByZone('pm25', dbRange, undefined, undefined, undefined, authToken),
-          fetchHistoryByZone('co2', dbRange, undefined, undefined, undefined, authToken),
-          fetchHistoryByZone('no2', dbRange, undefined, undefined, undefined, authToken),
+          fetchHistoryByZone('pm25', '1h', undefined, undefined, undefined, authToken),
+          fetchHistoryByZone('co2',  '1h', undefined, undefined, undefined, authToken),
+          fetchHistoryByZone('no2',  '1h', undefined, undefined, undefined, authToken),
         ]);
-
-        if (cancelled) return;
-
-        let len = pm25.length;
-        if (range === '6h') len = Math.min(len, 6);
-        if (range === '12h') len = Math.min(len, 12);
-        if (range === '3d') len = Math.min(len, 72);
-
-  const merged: AnalyticsPoint[] = [];
-        for (let i = 0; i < len; i++) {
+        for (let i = 0; i < pm25.length; i++) {
           const p25 = pm25[i]?.value ?? 0;
           merged.push({
-            time: pm25[i]?.label,
-            pm25: p25,
-            pm10: p25 * 1.18,
-            co2: co2[i]?.value ?? 0,
-            no2: no2[i]?.value ?? 0,
-            dust: p25 * 0.4,
-            isForecast: false
+            time:       pm25[i]?.label ?? '',
+            pm25:       p25,
+            pm10:       p25 * 1.18,
+            co2:        co2[i]?.value  ?? 0,
+            no2:        no2[i]?.value  ?? 0,
+            dust:       p25 * 0.4,
+            isForecast: false,
           });
         }
-        setHistoryData(merged);
-
-        if (showForecast) {
-          const fData = await fetchForecast(forecastHorizon, authToken);
-          if (!cancelled) setForecastData(fData);
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        if (!cancelled) setLoading(false);
       }
-    };
 
-    loadData();
-    return () => { cancelled = true; };
+      setHistoryData(merged);
+      setLastRefresh(new Date());
+
+      if (showForecast) {
+        const fData = await fetchForecast(forecastHorizon, authToken);
+        setForecastData(fData);
+      }
+    } catch (err) {
+      console.error('[AnalyticsView] loadData error:', err);
+    } finally {
+      setLoading(false);
+    }
   }, [authToken, range, showForecast, forecastHorizon]);
+
+  // Initial load + re-load when range / forecast settings change
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // 30-second auto-refresh (silent — no spinner)
+  useEffect(() => {
+    const id = setInterval(() => loadData(true), LIVE_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [loadData]);
 
   const combinedData = [...historyData];
   if (showForecast && forecastData.length > 0) {
@@ -245,25 +256,42 @@ export function AnalyticsView({ authToken }: AnalyticsViewProps) {
         <div className="analytics-chart-head">
           <div className="analytics-chart-title">
             <h3 className="eyebrow analytics-chart-eyebrow">
-              <Clock size={16} /> Real-time Satellite Telemetry
+              <Clock size={16} />
+              {USE_OPEN_METEO.has(range) ? 'Historical Air Quality · Open-Meteo' : 'Live Sensor Stream · 1-min resolution'}
             </h3>
             {showForecast && <span className="analytics-forecast-badge">Forecast Active</span>}
+            {USE_OPEN_METEO.has(range) && (
+              <span className="analytics-source-badge">CAMS Satellite · Riyadh 24.71°N 46.68°E</span>
+            )}
           </div>
-          <div className="analytics-series-toggles">
-            {(Object.keys(enabled) as Array<keyof typeof enabled>).map(key => (
-              <label
-                key={key}
-                className={`analytics-series-label analytics-series-${key} ${enabled[key] ? '' : 'is-disabled'}`}
-              >
-                <input 
-                  type="checkbox" 
-                  checked={enabled[key]} 
-                  onChange={() => setEnabled(prev => ({ ...prev, [key]: !prev[key] }))}
-                  className="analytics-series-checkbox"
-                />
-                <span className="analytics-series-text">{key.toUpperCase()}</span>
-              </label>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span className="analytics-last-refresh mono" title="Last data refresh">
+              ↺ {lastRefresh.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+            <button
+              className="icon-btn"
+              onClick={() => loadData()}
+              title="Refresh now"
+              style={{ width: 28, height: 28, borderRadius: 7 }}
+            >
+              <RefreshCw size={12} />
+            </button>
+            <div className="analytics-series-toggles">
+              {(Object.keys(enabled) as Array<keyof typeof enabled>).map(key => (
+                <label
+                  key={key}
+                  className={`analytics-series-label analytics-series-${key} ${enabled[key] ? '' : 'is-disabled'}`}
+                >
+                  <input 
+                    type="checkbox" 
+                    checked={enabled[key]} 
+                    onChange={() => setEnabled(prev => ({ ...prev, [key]: !prev[key] }))}
+                    className="analytics-series-checkbox"
+                  />
+                  <span className="analytics-series-text">{key.toUpperCase()}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 

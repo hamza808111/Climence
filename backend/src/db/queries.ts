@@ -203,18 +203,22 @@ export function getHistoricalAvg(windowMinutes: number): TrendPoint[] {
 type Pollutant = 'pm25' | 'co2' | 'no2';
 
 const RANGE_MINUTES: Record<string, number> = {
-  '1h':  60,
-  '24h': 1440,
-  '7d':  10080,
-  '30d': 43200,
-  '90d': 129600,
+  '1h':   60,
+  '6h':   360,
+  '12h':  720,
+  '24h':  1440,
+  '7d':   10080,
+  '30d':  43200,
+  '90d':  129600,
 };
 
 const BUCKET_MINUTES: Record<string, number> = {
   '1h':  1,
-  '24h': 60,
-  '7d':  60,
-  '30d': 1440,
+  '6h':  5,
+  '12h': 5,
+  '24h': 5,
+  '7d':  30,
+  '30d': 360,
   '90d': 1440,
 };
 
@@ -240,10 +244,26 @@ export function getHistoryByZone(
   // SQLite strftime format that groups by the right bucket
   const fmtMap: Record<number, string> = {
     1:    '%Y-%m-%dT%H:%M:00Z',
+    5:    '%Y-%m-%dT%H:%f:00Z',   // will be overridden below
+    30:   '%Y-%m-%dT%H:%M:00Z',   // will be overridden below
     60:   '%Y-%m-%dT%H:00:00Z',
+    360:  '%Y-%m-%dT%H:00:00Z',   // will be overridden below
     1440: '%Y-%m-%dT00:00:00Z',
   };
-  const fmt = fmtMap[bucketMin] ?? '%Y-%m-%dT%H:00:00Z';
+
+  // For sub-hour buckets that need rounding, use minute-level grouping
+  // but truncated to the bucket size via integer division trick.
+  let fmt: string;
+  if (bucketMin === 5) {
+    // Group by 5-minute slots: floor(minute/5)*5
+    fmt = '%Y-%m-%dT%H:'; // handled specially below
+  } else if (bucketMin === 30) {
+    fmt = '%Y-%m-%dT%H:'; // handled specially below
+  } else if (bucketMin === 360) {
+    fmt = '%Y-%m-%dT%H:00:00Z';
+  } else {
+    fmt = fmtMap[bucketMin] ?? '%Y-%m-%dT%H:00:00Z';
+  }
 
   // Build query dynamically (still uses prepared-style binding for values)
   // Zone filter uses a bounding box approximation (cheap, no extension needed).
@@ -263,16 +283,48 @@ export function getHistoryByZone(
 
   const col = pollutant; // pm25 | co2 | no2  (column names match exactly)
 
-  const stmt = db.prepare(`
-    SELECT
-      strftime('${fmt}', server_timestamp) as label,
-      AVG(${col}) as value
-    FROM TelemetryLogs
-    WHERE server_timestamp >= datetime('now', ? || ' minutes')
-    ${zoneClause}
-    GROUP BY strftime('${fmt}', server_timestamp)
-    ORDER BY server_timestamp ASC
-  `);
+  let stmt;
+  if (bucketMin === 5) {
+    // Group into 5-minute windows: cast(strftime('%M')/5)*5
+    stmt = db.prepare(`
+      SELECT
+        strftime('%Y-%m-%dT%H:', server_timestamp)
+          || printf('%02d', (CAST(strftime('%M', server_timestamp) AS INTEGER) / 5) * 5)
+          || ':00Z' as label,
+        AVG(${col}) as value
+      FROM TelemetryLogs
+      WHERE server_timestamp >= datetime('now', ? || ' minutes')
+      ${zoneClause}
+      GROUP BY strftime('%Y-%m-%d %H', server_timestamp),
+               (CAST(strftime('%M', server_timestamp) AS INTEGER) / 5)
+      ORDER BY server_timestamp ASC
+    `);
+  } else if (bucketMin === 30) {
+    stmt = db.prepare(`
+      SELECT
+        strftime('%Y-%m-%dT%H:', server_timestamp)
+          || printf('%02d', (CAST(strftime('%M', server_timestamp) AS INTEGER) / 30) * 30)
+          || ':00Z' as label,
+        AVG(${col}) as value
+      FROM TelemetryLogs
+      WHERE server_timestamp >= datetime('now', ? || ' minutes')
+      ${zoneClause}
+      GROUP BY strftime('%Y-%m-%d %H', server_timestamp),
+               (CAST(strftime('%M', server_timestamp) AS INTEGER) / 30)
+      ORDER BY server_timestamp ASC
+    `);
+  } else {
+    stmt = db.prepare(`
+      SELECT
+        strftime('${fmt}', server_timestamp) as label,
+        AVG(${col}) as value
+      FROM TelemetryLogs
+      WHERE server_timestamp >= datetime('now', ? || ' minutes')
+      ${zoneClause}
+      GROUP BY strftime('${fmt}', server_timestamp)
+      ORDER BY server_timestamp ASC
+    `);
+  }
 
   return stmt.all(...params) as HistoryPoint[];
 }

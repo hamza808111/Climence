@@ -11,12 +11,16 @@ import { useLiveTelemetry } from './hooks/useLiveTelemetry';
 import { useDashboardData } from './hooks/useDashboardData';
 import { clearAuthSession, isSessionExpired, loadAuthSession } from './lib/auth-session';
 import { translate, type Locale } from './lib/i18n';
+import { MOCK_SNAPSHOT } from './lib/mockData';
 import { AuthScreen } from './components/AuthScreen';
 import { Shell } from './components/Shell';
 import { Dashboard } from './components/Dashboard';
 import { ReportModal } from './components/ReportModal';
 import { AnalyticsView } from './components/panels/AnalyticsView';
 import { LiveMapView } from './components/panels/LiveMapView';
+
+export type DataSource = 'live' | 'demo';
+const DS_KEY = 'climence.data-source';
 
 /* ═══════════════════════════ SESSION INIT ═══════════════════════════ */
 
@@ -37,6 +41,20 @@ export default function App() {
   const [authToken, setAuthToken] = useState<string | null>(initialSession?.token ?? null);
   const [authUser, setAuthUser] = useState<AuthUser | null>(initialSession?.user ?? null);
 
+  /* ── Data source (live / demo) — persisted ── */
+  const [dataSource, setDataSource] = useState<DataSource>(() => {
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem(DS_KEY) : null;
+    return stored === 'demo' ? 'demo' : 'live';
+  });
+
+  const handleToggleDataSource = useCallback(() => {
+    setDataSource(prev => {
+      const next: DataSource = prev === 'live' ? 'demo' : 'live';
+      window.localStorage.setItem(DS_KEY, next);
+      return next;
+    });
+  }, []);
+
   /* ── Layout ── */
   const [rtl, setRtl] = useState(false);
   const locale: Locale = rtl ? 'ar' : 'en';
@@ -48,7 +66,11 @@ export default function App() {
   }, [rtl]);
 
   /* ── Realtime ── */
-  const { snapshot, status } = useLiveTelemetry(authToken);
+  const { snapshot: liveSnapshot, status } = useLiveTelemetry(authToken);
+
+  // In demo mode, substitute the static mock; keep status as-is so the
+  // topbar connection indicator still reflects the real WS state.
+  const snapshot = dataSource === 'demo' ? MOCK_SNAPSHOT : liveSnapshot;
 
   /* ── Data hook (only runs when authenticated) ── */
   const data = useDashboardData(
@@ -106,6 +128,8 @@ export default function App() {
         modeSegment={modeSegment}
         currentTab={data.currentTab}
         onTabChange={data.setCurrentTab}
+        dataSource={dataSource}
+        onToggleDataSource={handleToggleDataSource}
         sideContent={data.currentTab === 'overview' ? <Dashboard data={data} position="side" /> : null}
       >
         {data.currentTab === 'overview' && <Dashboard data={data} position="main" />}

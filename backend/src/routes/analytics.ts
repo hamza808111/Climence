@@ -32,6 +32,7 @@ import { computeForecast } from '../features/analytics/forecast';
 import { attributeSources } from '../features/analytics/sources';
 import { requireAuth, requireRole } from '../lib/auth';
 import { sendBadRequest, sendInternalError } from '../lib/http';
+import { getHistoricalSlice } from '../features/analytics/openMeteo';
 
 const router = Router();
 const canViewAnalytics = rolesForPermission('canViewAnalytics');
@@ -101,7 +102,7 @@ router.get('/trend', requireAuth, requireRole(...canViewAnalytics), (req, res) =
 // GET /api/analytics/history?pollutant=pm25|co2|no2&range=1h|24h|7d|30d&zone=lat,lng,radiusKm
 // ---------------------------------------------------------------------------
 const VALID_POLLUTANTS = new Set(['pm25', 'co2', 'no2']);
-const VALID_RANGES     = new Set(['1h', '24h', '7d', '30d']);
+const VALID_RANGES     = new Set(['1h', '6h', '12h', '24h', '7d', '30d']);
 
 router.get('/history', requireAuth, requireRole(...canViewAnalytics), (req, res) => {
   try {
@@ -187,6 +188,44 @@ router.get('/sources', requireAuth, requireRole(...canViewAnalytics), (req, res)
     res.status(200).json(sources);
   } catch (err) {
     sendInternalError(res, 'Source attribution error', err);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/analytics/openmeteo-history?range=1h|6h|12h|24h|3d|7d|30d
+// Returns sliced Open-Meteo historical data (past_days=92) for the main chart
+// ---------------------------------------------------------------------------
+const OM_WINDOW_MS: Record<string, number> = {
+  '1h':  1      * 3_600_000,
+  '6h':  6      * 3_600_000,
+  '12h': 12     * 3_600_000,
+  '24h': 24     * 3_600_000,
+  '3d':  3  * 24 * 3_600_000,
+  '7d':  7  * 24 * 3_600_000,
+  '30d': 30 * 24 * 3_600_000,
+};
+
+router.get('/openmeteo-history', requireAuth, requireRole(...canViewAnalytics), (req, res) => {
+  try {
+    const range = (req.query['range'] as string | undefined) ?? '24h';
+    const windowMs = OM_WINDOW_MS[range];
+    if (!windowMs) {
+      sendBadRequest(res, `Invalid range. Use one of: ${Object.keys(OM_WINDOW_MS).join(', ')}`);
+      return;
+    }
+    const slice = getHistoricalSlice(windowMs);
+    // Return array of {label, pm25, pm10, co2, no2, dust}
+    const out = slice.map(r => ({
+      label: r.hourIso,
+      pm25:  Math.round(r.avgPm25  * 10) / 10,
+      pm10:  Math.round(r.pm10     * 10) / 10,
+      co2:   Math.round(r.co2      * 10) / 10,
+      no2:   Math.round(r.no2      * 10) / 10,
+      dust:  Math.round(r.dust     * 10) / 10,
+    }));
+    res.status(200).json(out);
+  } catch (err) {
+    sendInternalError(res, 'Open-Meteo history error', err);
   }
 });
 

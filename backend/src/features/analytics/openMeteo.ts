@@ -1,45 +1,65 @@
 import { RIYADH_CENTER } from '@climence/shared';
 import type { HourlyReading } from './forecast';
 
-let cachedForecast: HourlyReading[] = [];
+let cachedData: HourlyReading[] = []; // Past + future
 let pollingInterval: NodeJS.Timeout | null = null;
 
 export async function fetchOpenMeteoForecast() {
   try {
-    const res = await fetch(`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${RIYADH_CENTER.lat}&longitude=${RIYADH_CENTER.lng}&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,dust&timezone=UTC`);
+    // past_days=92 gives ~3 months of history + 5 days forward
+    const url =
+      `https://air-quality-api.open-meteo.com/v1/air-quality` +
+      `?latitude=${RIYADH_CENTER.lat}&longitude=${RIYADH_CENTER.lng}` +
+      `&hourly=pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,dust` +
+      `&timezone=UTC&past_days=92`;
+
+    const res  = await fetch(url);
     const data = await res.json();
 
-    if (data.hourly && data.hourly.time && data.hourly.pm2_5) {
+    if (data.hourly?.time && data.hourly?.pm2_5) {
       const newCache: HourlyReading[] = [];
       for (let i = 0; i < data.hourly.time.length; i++) {
-        const timeStr = data.hourly.time[i] + 'Z';
         const pm25 = data.hourly.pm2_5[i];
-        if (pm25 !== null && pm25 !== undefined) {
-          newCache.push({
-            hourIso: new Date(timeStr).toISOString(),
-            avgPm25: pm25,
-            pm10: data.hourly.pm10[i] ?? 0,
-            co2: (data.hourly.carbon_monoxide[i] ?? 300) * 1.5, // Deriving CO2 from CO like in simulator
-            no2: data.hourly.nitrogen_dioxide[i] ?? 0,
-            dust: data.hourly.dust[i] ?? 0
-          });
-        }
+        if (pm25 === null || pm25 === undefined) continue;
+        newCache.push({
+          hourIso:  new Date(data.hourly.time[i] + 'Z').toISOString(),
+          avgPm25:  pm25,
+          pm10:     data.hourly.pm10[i]              ?? pm25 * 1.2,
+          co2:      (data.hourly.carbon_monoxide[i]  ?? 300) * 1.5,
+          no2:      data.hourly.nitrogen_dioxide[i]  ?? 0,
+          dust:     data.hourly.dust[i]              ?? pm25 * 0.4,
+        });
       }
-      cachedForecast = newCache;
-      console.log(`[Open-Meteo] Successfully fetched and cached ${newCache.length} hours of multi-pollutant forecast.`);
+      cachedData = newCache;
+      console.log(`[Open-Meteo] Cached ${newCache.length} hours (past 92d + forecast).`);
     }
   } catch (err) {
-    console.error('[Open-Meteo] Failed to fetch forecast:', err);
+    console.error('[Open-Meteo] Failed to fetch:', err);
   }
 }
 
 export function startOpenMeteoPolling() {
-  // Fetch immediately on boot
   fetchOpenMeteoForecast();
-  // Then every 60 minutes
+  // Refresh every 60 minutes
   pollingInterval = setInterval(fetchOpenMeteoForecast, 60 * 60 * 1000);
 }
 
+/** Return only future (forecast) hourly readings. */
 export function getCachedForecast(): HourlyReading[] {
-  return cachedForecast;
+  const nowMs = Date.now();
+  return cachedData.filter(r => new Date(r.hourIso).getTime() > nowMs);
+}
+
+/**
+ * Return a slice of history (past data only) for the analytics chart.
+ * @param windowMs  How many milliseconds back from now to include.
+ */
+export function getHistoricalSlice(windowMs: number): HourlyReading[] {
+  const nowMs  = Date.now();
+  const fromMs = nowMs - windowMs;
+  // Include up to the current hour (not future)
+  return cachedData.filter(r => {
+    const t = new Date(r.hourIso).getTime();
+    return t >= fromMs && t <= nowMs + 3_600_000; // +1h so the current hour shows
+  });
 }

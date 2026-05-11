@@ -7,6 +7,7 @@ import {
   Cpu,
   Download,
   FileText,
+  FlaskConical,
   Home,
   Languages,
   Layers,
@@ -17,8 +18,10 @@ import {
   Siren,
   Users,
   X,
+  Zap,
 } from 'lucide-react';
 import { UserRole, type AuthUser } from '@climence/shared';
+import type { DataSource } from '../App';
 import type { ConnectionStatus } from '../hooks/useLiveTelemetry';
 import { translate, type DictKey, type Locale } from '../lib/i18n';
 import climenceLogo from '../assets/climence-logo.png';
@@ -48,6 +51,10 @@ export interface ShellProps {
   sideContent: ReactNode;
   currentTab: 'overview' | 'livemap' | 'analytics';
   onTabChange: (tab: 'overview' | 'livemap' | 'analytics') => void;
+  /** Current data source mode. */
+  dataSource: DataSource;
+  /** Callback to toggle between live and demo. */
+  onToggleDataSource: () => void;
 }
 
 export function Shell({
@@ -66,6 +73,8 @@ export function Shell({
   sideContent,
   currentTab,
   onTabChange,
+  dataSource,
+  onToggleDataSource,
 }: ShellProps) {
   const t = (key: DictKey) => translate(key, locale);
   const statusMeta = STATUS_META[status];
@@ -229,6 +238,33 @@ export function Shell({
           <span className={`pulse ${statusMeta.dotClass}`} />
           {statusMeta.label} · {liveAge}
         </span>
+
+        {/* ── Data-source toggle ── */}
+        <button
+          id="data-source-toggle"
+          className={`ds-toggle ${dataSource === 'demo' ? 'ds-toggle--demo' : 'ds-toggle--live'}`}
+          onClick={onToggleDataSource}
+          title={dataSource === 'live' ? 'Switch to Demo data' : 'Switch to Live data'}
+          aria-pressed={dataSource === 'demo'}
+        >
+          <span className="ds-toggle-track">
+            <span className="ds-toggle-thumb" />
+          </span>
+          <span className="ds-toggle-live">
+            <Zap size={10} />
+            Live
+          </span>
+          <span className="ds-toggle-demo">
+            <FlaskConical size={10} />
+            Demo
+          </span>
+        </button>
+
+        {dataSource === 'demo' && (
+          <span className="topbar-demo-badge" title="Showing static demo data — not connected to live sensors">
+            DEMO
+          </span>
+        )}
 
         {modeSegment}
 
