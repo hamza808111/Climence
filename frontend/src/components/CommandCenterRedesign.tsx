@@ -23,12 +23,12 @@ const SENSOR_FILTERS = ['PM2.5', 'PM10', 'NO2', 'CO2'];
 
 type DashboardData = ReturnType<typeof useDashboardData>;
 
-export function CommandCenterRedesign({ data }: { data: DashboardData }) {
+export function CommandCenterRedesign({ data, onNavigate }: { data: DashboardData, onNavigate?: (tab: string) => void }) {
   const KPI_CARDS = [
     { label: 'City AQI', value: data.cityAqi.toString(), meta: aqiBandFor(data.cityAqi).label, tone: data.cityBand === 'haz' || data.cityBand === 'vunh' ? 'hazard' : data.cityBand === 'unh' ? 'warn' : 'good', icon: Activity },
     { label: 'PM2.5', value: data.pm25Now.toString(), meta: `µg/m³ · ${data.trendLabel}`, tone: data.cityBand === 'haz' || data.cityBand === 'vunh' ? 'hazard' : data.cityBand === 'unh' ? 'warn' : 'good', icon: Gauge },
-    { label: 'Active Alerts', value: data.feed.length.toString(), meta: `${data.feed.filter(a => a.severity === 'crit').length} critical`, tone: data.feed.length > 0 ? 'alert' : 'good', icon: Siren },
-    { label: 'Sensors Online', value: `${data.onlineSensors}/${data.sensors.length}`, meta: '100% coverage', tone: data.onlineSensors === data.sensors.length ? 'good' : 'warn', icon: Cpu },
+    { label: 'Active Alerts', value: data.feed.length.toString(), meta: `${data.feed.filter(a => a.severity === 'crit').length} critical`, tone: data.feed.length > 0 ? 'alert' : 'good', icon: Siren, actionName: 'Go to alerts', actionTab: 'alerts' },
+    { label: 'Sensors Online', value: `${data.onlineSensors}/${data.sensors.length}`, meta: '100% coverage', tone: data.onlineSensors === data.sensors.length ? 'good' : 'warn', icon: Cpu, actionName: 'See all sensors', actionTab: 'sensors' },
     { label: 'Wind', value: data.drift.speedKmh.toString(), meta: `km/h · ${data.drift.cardinal}`, tone: 'neutral', icon: Wind },
   ];
 
@@ -131,7 +131,14 @@ export function CommandCenterRedesign({ data }: { data: DashboardData }) {
                     </span>
                   </div>
                   <div className="cc-kpi-value">{card.value}</div>
-                  <div className="cc-kpi-meta">{card.meta}</div>
+                  <div className="cc-kpi-meta flex items-center justify-between w-full">
+                    <span>{card.meta}</span>
+                    {onNavigate && card.actionName && card.actionTab && (
+                      <button onClick={() => onNavigate(card.actionTab as string)} className="text-[var(--cc-teal)] hover:underline text-xs font-medium cursor-pointer">
+                        {card.actionName}
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}

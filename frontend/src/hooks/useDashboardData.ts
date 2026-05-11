@@ -301,7 +301,7 @@ export function useDashboardData(
   const [mapBounds, setMapBounds] = useState<RiyadhMapBounds | null>(null);
   const [mapZoom, setMapZoom] = useState(11);
   const [zoomPreset, setZoomPreset] = useState<RiyadhZoomPreset>('city');
-  const [currentTab, setCurrentTab] = useState<'overview' | 'livemap' | 'analytics' | 'alerts'>('overview');
+  const [currentTab, setCurrentTab] = useState<'overview' | 'livemap' | 'analytics' | 'alerts' | 'sensors'>('overview');
   const [mapFocusTarget, setMapFocusTarget] = useState<{ lat: number; lng: number; zoom?: number; nonce: number } | null>(null);
   const [historySeries, setHistorySeries] = useState<number[]>([]);
   const [historySourceUuid, setHistorySourceUuid] = useState<string | null>(null);

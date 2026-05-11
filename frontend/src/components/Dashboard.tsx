@@ -177,16 +177,17 @@ interface DashboardProps {
   data: DashboardData;
   /** Which portion to render — 'main' for center area, 'side' for sidebar. */
   position: 'main' | 'side';
+  onNavigate?: (tab: 'overview' | 'livemap' | 'analytics' | 'alerts' | 'sensors') => void;
 }
 
-export function Dashboard({ data: d, position }: DashboardProps) {
-  if (position === 'main') return <MainContent d={d} />;
+export function Dashboard({ data: d, position, onNavigate }: DashboardProps) {
+  if (position === 'main') return <MainContent d={d} onNavigate={onNavigate} />;
   return <SideContent d={d} />;
 }
 
 /* ───── Main (KPI strip + map stage) ───── */
 
-function MainContent({ d }: { d: DashboardData }) {
+function MainContent({ d, onNavigate }: { d: DashboardData; onNavigate?: (tab: 'overview' | 'livemap' | 'analytics' | 'alerts' | 'sensors') => void }) {
   const statusLabel = d.status === 'open' ? 'live' : d.status === 'connecting' ? 'connecting' : 'reconnecting';
   const statusDotClass = d.status === 'open' ? 'ok' : 'warn';
   const [kpiCollapsed, setKpiCollapsed] = useState(() => {
@@ -233,7 +234,12 @@ function MainContent({ d }: { d: DashboardData }) {
           <div className="kpi">
             <div className="kpi-label eyebrow"><Siren size={11} /> {d.t('kpi.alerts')}</div>
             <div className="kpi-row kpi-row--baseline"><div className="kpi-value" style={{ color: 'var(--aqi-unh)' }}>{d.feed.length}</div><span className="kpi-unit">threshold {d.effectiveAlertThreshold}+ ug/m3</span></div>
-            <div className="kpi-meta">{d.feed.length} items in live feed</div>
+            <div className="kpi-meta flex items-center justify-between w-full">
+              <span>{d.feed.length} items in live feed</span>
+              {onNavigate && (
+                <button onClick={() => onNavigate('alerts')} className="text-[var(--brand)] hover:underline text-xs font-medium cursor-pointer">Go to Alerts</button>
+              )}
+            </div>
           </div>
 
           <div className="kpi">
@@ -242,7 +248,12 @@ function MainContent({ d }: { d: DashboardData }) {
               <div className="kpi-value">{d.onlineSensorsInView}<span className="kpi-value-sub">/{d.sensorsInView.length}</span></div>
               <span className="kpi-delta down"><ArrowDown size={11} strokeWidth={2.5} />{Math.max(0, d.sensorsInView.length - d.onlineSensorsInView)} offline</span>
             </div>
-            <div className="kpi-meta">{d.mapBounds ? `Viewport filter active · ${statusLabel}` : `Realtime stream · ${statusLabel}`}</div>
+            <div className="kpi-meta flex items-center justify-between w-full">
+              <span>{d.mapBounds ? `Viewport filter active · ${statusLabel}` : `Realtime stream · ${statusLabel}`}</span>
+              {onNavigate && (
+                <button onClick={() => onNavigate('sensors')} className="text-[var(--brand)] hover:underline text-xs font-medium cursor-pointer">See all sensors</button>
+              )}
+            </div>
           </div>
 
           <div className="kpi">

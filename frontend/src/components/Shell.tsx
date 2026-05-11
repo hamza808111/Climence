@@ -13,6 +13,7 @@ import {
   Layers,
   Map as MapIcon,
   Menu,
+  Radio,
   Search,
   Settings,
   Siren,
@@ -49,8 +50,8 @@ export interface ShellProps {
   children: ReactNode;
   /** Everything rendered inside the side rail (<aside>). */
   sideContent: ReactNode;
-  currentTab: 'overview' | 'livemap' | 'analytics' | 'alerts';
-  onTabChange: (tab: 'overview' | 'livemap' | 'analytics' | 'alerts') => void;
+  currentTab: 'overview' | 'livemap' | 'analytics' | 'alerts' | 'sensors';
+  onTabChange: (tab: 'overview' | 'livemap' | 'analytics' | 'alerts' | 'sensors') => void;
   /** Current data source mode. */
   dataSource: DataSource;
   /** Callback to toggle between live and demo. */
@@ -176,6 +177,14 @@ export function Shell({
             <Siren size={16} />
             <span className="nav-label">{t('nav.alerts')}</span>
             <span className="count tnum">{feedCount}</span>
+          </button>
+          <button 
+            className={`nav-item ${currentTab === 'sensors' ? 'active' : ''}`}
+            onClick={() => onTabChange('sensors')}
+            title="Grid Sensors"
+          >
+            <Radio size={16} />
+            <span className="nav-label">Grid Sensors</span>
           </button>
         </div>
 
