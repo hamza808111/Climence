@@ -1,6 +1,7 @@
 import { Activity, Battery, CloudRain, Cpu, Radio, Thermometer } from 'lucide-react';
 import type { DashboardData } from '../../hooks/useDashboardData';
 import { aqiBandFor, pm25ToAqi } from '@climence/shared';
+import { formatNumber } from '../../lib/i18n';
 
 export function SensorsView({ data: d }: { data: DashboardData }) {
   return (
@@ -14,28 +15,28 @@ export function SensorsView({ data: d }: { data: DashboardData }) {
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(3,218,197,0.1)] text-[var(--cc-teal)] text-xs font-semibold tracking-wide uppercase mb-4">
-                <Radio size={12} className="animate-pulse" /> Grid Network
+                <Radio size={12} className="animate-pulse" /> {d.t('sensors.gridNetwork')}
               </div>
-              <h1 className="text-3xl font-bold tracking-tight mb-2 text-[var(--cc-text)]">Sensor Array</h1>
-              <p className="text-[var(--cc-muted)] text-base max-w-xl">Monitor the real-time telemetry and hardware status of all active environmental sensors across the city grid.</p>
+              <h1 className="text-3xl font-bold tracking-tight mb-2 text-[var(--cc-text)]">{d.t('sensors.title')}</h1>
+              <p className="text-[var(--cc-muted)] text-base max-w-xl">{d.t('sensors.subtitle')}</p>
             </div>
             
             <div className="flex gap-4">
               <div className="flex flex-col items-end">
                 <span className="text-4xl font-light tracking-tighter text-[var(--cc-text)]">{d.sensors.length}</span>
-                <span className="text-sm font-medium text-[var(--cc-muted)] uppercase tracking-wider">Total Units</span>
+                <span className="text-sm font-medium text-[var(--cc-muted)] uppercase tracking-wider">{d.t('sensors.totalUnits')}</span>
               </div>
               <div className="w-px bg-[var(--cc-border)] self-stretch mx-2" />
               <div className="flex flex-col items-end">
                 <span className="text-4xl font-light tracking-tighter text-[var(--cc-teal)]">{d.onlineSensors}</span>
-                <span className="text-sm font-medium text-[var(--cc-teal)] uppercase tracking-wider">Online</span>
+                <span className="text-sm font-medium text-[var(--cc-teal)] uppercase tracking-wider">{d.t('sensors.online')}</span>
               </div>
               {d.sensors.length - d.onlineSensors > 0 && (
                 <>
                   <div className="w-px bg-[var(--cc-border)] self-stretch mx-2" />
                   <div className="flex flex-col items-end">
                     <span className="text-4xl font-light tracking-tighter text-[var(--cc-hazard)]">{d.sensors.length - d.onlineSensors}</span>
-                    <span className="text-sm font-medium text-[var(--cc-hazard)] uppercase tracking-wider">Offline</span>
+                    <span className="text-sm font-medium text-[var(--cc-hazard)] uppercase tracking-wider">{d.t('sensors.offline')}</span>
                   </div>
                 </>
               )}
@@ -59,7 +60,7 @@ export function SensorsView({ data: d }: { data: DashboardData }) {
                   <div>
                     <h3 className="text-lg font-bold text-[var(--cc-text)] flex items-center gap-2">
                       <Cpu size={18} className={isOffline ? 'text-[var(--cc-muted)]' : 'text-[var(--cc-teal)]'} />
-                      {sensor.label || `Sensor ${sensor.uuid.slice(0, 8)}`}
+                      {sensor.label || `${d.t('nav.sensors')} ${sensor.uuid.slice(0, 8)}`}
                     </h3>
                     <p className="text-xs text-[var(--cc-muted)] font-mono mt-1">{sensor.lat.toFixed(4)}, {sensor.lng.toFixed(4)}</p>
                   </div>
@@ -68,36 +69,36 @@ export function SensorsView({ data: d }: { data: DashboardData }) {
                       ? 'bg-transparent text-[var(--cc-muted)] border-[var(--cc-border)]' 
                       : 'bg-[rgba(3,218,197,0.1)] text-[var(--cc-teal)] border-[rgba(3,218,197,0.2)]'
                   }`}>
-                    {isOffline ? 'Offline' : 'Online'}
+                    {isOffline ? d.t('sensors.offline') : d.t('sensors.online')}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 flex-1">
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><Activity size={12} /> PM2.5</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><Activity size={12} /> {d.t('sensors.pm25')}</span>
                     <span className="text-xl font-medium tnum flex items-baseline gap-1">
-                      {isOffline ? '--' : Math.round(sensor.pm25)}
+                      {isOffline ? '--' : formatNumber(Math.round(sensor.pm25), d.locale)}
                       <span className="text-xs text-[var(--cc-muted)]">µg/m³</span>
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><CloudRain size={12} /> NO2</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><CloudRain size={12} /> {d.t('sensors.no2')}</span>
                     <span className="text-xl font-medium tnum flex items-baseline gap-1">
-                      {isOffline ? '--' : Math.round(sensor.no2)}
+                      {isOffline ? '--' : formatNumber(Math.round(sensor.no2), d.locale)}
                       <span className="text-xs text-[var(--cc-muted)]">ppb</span>
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><Thermometer size={12} /> Temp</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><Thermometer size={12} /> {d.t('sensors.temp')}</span>
                     <span className="text-xl font-medium tnum flex items-baseline gap-1">
-                      {isOffline ? '--' : Math.round(sensor.temperature)}
+                      {isOffline ? '--' : formatNumber(Math.round(sensor.temperature), d.locale)}
                       <span className="text-xs text-[var(--cc-muted)]">°C</span>
                     </span>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><Battery size={12} /> Battery</span>
+                    <span className="text-[10px] uppercase tracking-wider text-[var(--cc-muted)] flex items-center gap-1"><Battery size={12} /> {d.t('sensors.battery')}</span>
                     <span className={`text-xl font-medium tnum flex items-baseline gap-1 ${!isOffline && sensor.battery < 20 ? 'text-[var(--cc-hazard)]' : ''}`}>
-                      {isOffline ? '--' : Math.round(sensor.battery)}
+                      {isOffline ? '--' : formatNumber(Math.round(sensor.battery), d.locale)}
                       <span className="text-xs text-[var(--cc-muted)]">%</span>
                     </span>
                   </div>
@@ -105,9 +106,9 @@ export function SensorsView({ data: d }: { data: DashboardData }) {
 
                 {!isOffline && (
                   <div className="mt-6 pt-4 border-t border-[var(--cc-border)] flex items-center justify-between">
-                    <span className="text-sm text-[var(--cc-muted)]">Current AQI</span>
+                    <span className="text-sm text-[var(--cc-muted)]">{d.t('sensors.currentAqi')}</span>
                     <span className="text-sm font-bold" style={{ color: aqiBand.key === 'good' ? 'var(--cc-teal)' : aqiBand.key === 'mod' || aqiBand.key === 'usg' ? 'var(--cc-warn)' : 'var(--cc-hazard)' }}>
-                      {Math.round(sensor.aqi || pm25ToAqi(sensor.pm25))} · {aqiBand.label}
+                      {formatNumber(Math.round(sensor.aqi || pm25ToAqi(sensor.pm25)), d.locale)} · {aqiBand.label}
                     </span>
                   </div>
                 )}

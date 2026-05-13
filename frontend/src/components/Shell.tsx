@@ -27,10 +27,10 @@ import type { ConnectionStatus } from '../hooks/useLiveTelemetry';
 import { translate, type DictKey, type Locale } from '../lib/i18n';
 import climenceLogo from '../assets/climence-logo.png';
 
-const STATUS_META: Record<ConnectionStatus, { label: string; dotClass: string }> = {
-  open: { label: 'Live', dotClass: 'ok' },
-  connecting: { label: 'Connecting', dotClass: 'warn' },
-  reconnecting: { label: 'Reconnecting', dotClass: 'warn' },
+const STATUS_META: Record<ConnectionStatus, { labelKey: DictKey; dotClass: string }> = {
+  open: { labelKey: 'app.live', dotClass: 'ok' },
+  connecting: { labelKey: 'app.connecting', dotClass: 'warn' },
+  reconnecting: { labelKey: 'app.reconnecting', dotClass: 'warn' },
 };
 
 export interface ShellProps {
@@ -100,10 +100,21 @@ export function Shell({
 
   const roleLabel =
     authUser.role === UserRole.ADMINISTRATOR
-      ? 'Administrator'
+      ? t('nav.role.administrator')
       : authUser.role === UserRole.ANALYST
-        ? 'Analyst'
-        : 'Viewer';
+        ? t('nav.role.analyst')
+        : t('nav.role.viewer');
+
+  const currentCrumbLabel =
+    currentTab === 'livemap'
+      ? t('nav.livemap')
+      : currentTab === 'analytics'
+        ? t('nav.analytics')
+        : currentTab === 'alerts'
+          ? t('nav.alerts')
+          : currentTab === 'sensors'
+            ? t('nav.gridSensors')
+            : t('nav.overview');
 
   const handleNavToggle = () => {
     if (typeof window !== 'undefined' && window.innerWidth <= 1024) {
@@ -137,7 +148,7 @@ export function Shell({
           <button
             className="icon-btn nav-close-btn"
             onClick={() => setNavOpen(false)}
-            aria-label="Close navigation"
+            aria-label={t('app.closeNav')}
           >
             <X size={14} />
           </button>
@@ -149,6 +160,7 @@ export function Shell({
             className={`nav-item ${currentTab === 'overview' ? 'active' : ''}`}
             onClick={() => onTabChange('overview')}
             title={t('nav.overview')}
+            aria-current={currentTab === 'overview' ? 'page' : undefined}
           >
             <Home size={16} />
             <span className="nav-label">{t('nav.overview')}</span>
@@ -157,6 +169,7 @@ export function Shell({
             className={`nav-item ${currentTab === 'livemap' ? 'active' : ''}`}
             onClick={() => onTabChange('livemap')}
             title={t('nav.livemap')}
+            aria-current={currentTab === 'livemap' ? 'page' : undefined}
           >
             <MapIcon size={16} />
             <span className="nav-label">{t('nav.livemap')}</span>
@@ -165,6 +178,7 @@ export function Shell({
             className={`nav-item ${currentTab === 'analytics' ? 'active' : ''}`}
             onClick={() => onTabChange('analytics')}
             title={t('nav.analytics')}
+            aria-current={currentTab === 'analytics' ? 'page' : undefined}
           >
             <BarChart3 size={16} />
             <span className="nav-label">{t('nav.analytics')}</span>
@@ -173,6 +187,7 @@ export function Shell({
             className={`nav-item ${currentTab === 'alerts' ? 'active' : ''}`}
             onClick={() => onTabChange('alerts')}
             title={t('nav.alerts')}
+            aria-current={currentTab === 'alerts' ? 'page' : undefined}
           >
             <Siren size={16} />
             <span className="nav-label">{t('nav.alerts')}</span>
@@ -181,10 +196,11 @@ export function Shell({
           <button 
             className={`nav-item ${currentTab === 'sensors' ? 'active' : ''}`}
             onClick={() => onTabChange('sensors')}
-            title="Grid Sensors"
+            title={t('nav.gridSensors')}
+            aria-current={currentTab === 'sensors' ? 'page' : undefined}
           >
             <Radio size={16} />
-            <span className="nav-label">Grid Sensors</span>
+            <span className="nav-label">{t('nav.gridSensors')}</span>
           </button>
         </div>
 
@@ -224,7 +240,7 @@ export function Shell({
             <div className="avatar">{userInitials || 'U'}</div>
             <div className="user-chip-meta">
               <div className="user-name">{authUser.name}</div>
-              <div className="user-role">{roleLabel} · Riyadh</div>
+              <div className="user-role">{roleLabel} · {t('nav.region.riyadh')}</div>
             </div>
             <ChevronRight size={14} />
           </div>
@@ -236,7 +252,7 @@ export function Shell({
         <button
           className="icon-btn hamburger-btn"
           onClick={handleNavToggle}
-          aria-label="Toggle navigation"
+          aria-label={t('app.toggleNav')}
         >
           <Menu size={16} />
         </button>
@@ -244,12 +260,12 @@ export function Shell({
         <div className="crumb desktop-only">
           <span>{t('app.crumb.monitor')}</span>
           <span className="crumb-sep"> / </span>
-          <span className="crumb-cur">{t('app.crumb.overview')}</span>
+          <span className="crumb-cur">{currentCrumbLabel}</span>
         </div>
 
-        <span className="live">
+        <span className="live" aria-live="polite">
           <span className={`pulse ${statusMeta.dotClass}`} />
-          {statusMeta.label} · {liveAge}
+          {t(statusMeta.labelKey)} · {liveAge}
         </span>
 
         {/* ── Data-source toggle ── */}
@@ -257,7 +273,7 @@ export function Shell({
           id="data-source-toggle"
           className={`ds-toggle ${dataSource === 'demo' ? 'ds-toggle--demo' : 'ds-toggle--live'}`}
           onClick={onToggleDataSource}
-          title={dataSource === 'live' ? 'Switch to Demo data' : 'Switch to Live data'}
+          title={dataSource === 'live' ? t('app.switchToDemo') : t('app.switchToLive')}
           aria-pressed={dataSource === 'demo'}
         >
           <span className="ds-toggle-track">
@@ -265,17 +281,17 @@ export function Shell({
           </span>
           <span className="ds-toggle-live">
             <Zap size={10} />
-            Live
+            {t('app.live')}
           </span>
           <span className="ds-toggle-demo">
             <FlaskConical size={10} />
-            Demo
+            {t('app.demo')}
           </span>
         </button>
 
         {dataSource === 'demo' && (
-          <span className="topbar-demo-badge" title="Showing static demo data — not connected to live sensors">
-            DEMO
+          <span className="topbar-demo-badge" title={t('app.demo.title')}>
+            {t('app.demo.badge')}
           </span>
         )}
 
@@ -289,13 +305,13 @@ export function Shell({
           <span className="kbd desktop-only">⌘K</span>
         </div>
 
-        <button className="icon-btn desktop-only" onClick={onToggleRtl} title="Toggle direction">
+        <button className="icon-btn desktop-only" onClick={onToggleRtl} title={t('app.toggleDirection')}>
           <Languages size={15} />
         </button>
-        <button className="icon-btn desktop-only" title="Calendar">
+        <button className="icon-btn desktop-only" title={t('app.calendar')}>
           <Calendar size={15} />
         </button>
-        <button className="icon-btn" title="Notifications">
+        <button className="icon-btn" title={t('app.notifications')}>
           <Bell size={15} />
           <span className="badge tnum">{feedCount}</span>
         </button>
