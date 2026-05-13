@@ -5,6 +5,22 @@ import {
   type TelemetryRecord,
 } from '@climence/shared';
 
+export class ApiError extends Error {
+  readonly status?: number;
+  readonly retryAfterSec?: number;
+
+  constructor(
+    message: string,
+    status?: number,
+    retryAfterSec?: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.retryAfterSec = retryAfterSec;
+  }
+}
+
 function withAuth(token?: string) {
   return token ? ({ Authorization: `Bearer ${token}` } as Record<string, string>) : {};
 }
@@ -19,6 +35,54 @@ export async function fetchHistory(droneId: string, token?: string): Promise<Tel
   return res.json() as Promise<TelemetryRecord[]>;
 }
 
+export async function fetchHistoryByZone(
+  pollutant: string,
+  range: string,
+  lat?: number,
+  lng?: number,
+  radiusKm?: number,
+  token?: string
+): Promise<{ label: string; value: number }[]> {
+  const params = new URLSearchParams({ pollutant, range });
+  if (lat !== undefined && lng !== undefined && radiusKm !== undefined) {
+    params.set('zone', `${lat},${lng},${radiusKm}`);
+  }
+  const res = await fetch(`${API_BASE_URL}/api/analytics/history?${params.toString()}`, {
+    headers: withAuth(token),
+  });
+  if (!res.ok) throw new Error(`GET history by zone failed: ${res.status}`);
+  return res.json() as Promise<{ label: string; value: number }[]>;
+}
+
+export interface OpenMeteoHistoryPoint {
+  label: string;
+  pm25: number;
+  pm10: number;
+  co2: number;
+  no2: number;
+  dust: number;
+}
+
+export async function fetchOpenMeteoHistory(
+  range: string,
+  token?: string
+): Promise<OpenMeteoHistoryPoint[]> {
+  const params = new URLSearchParams({ range });
+  const res = await fetch(`${API_BASE_URL}/api/analytics/openmeteo-history?${params.toString()}`, {
+    headers: withAuth(token),
+  });
+  if (!res.ok) throw new Error(`GET openmeteo-history failed: ${res.status}`);
+  return res.json() as Promise<OpenMeteoHistoryPoint[]>;
+}
+
+export async function fetchForecast(hours: number, token?: string) {
+  const res = await fetch(`${API_BASE_URL}/api/analytics/forecast?hours=${hours}`, {
+    headers: withAuth(token),
+  });
+  if (!res.ok) throw new Error(`GET forecast failed: ${res.status}`);
+  return res.json();
+}
+
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
     method: 'POST',
@@ -26,7 +90,28 @@ export async function login(payload: LoginRequest): Promise<LoginResponse> {
     body: JSON.stringify(payload),
   });
 
-  if (!res.ok) throw new Error(`Login failed: ${res.status}`);
+  if (!res.ok) {
+    let message = `Login failed (${res.status})`;
+    let retryAfterSec: number | undefined;
+
+    const retryAfter = res.headers.get('retry-after');
+    if (retryAfter) {
+      const parsed = Number(retryAfter);
+      if (Number.isFinite(parsed) && parsed > 0) retryAfterSec = parsed;
+    }
+
+    try {
+      const body = (await res.json()) as { message?: string };
+      if (typeof body?.message === 'string' && body.message.trim()) {
+        message = body.message;
+      }
+    } catch {
+      // Non-JSON response; keep the status-based fallback message.
+    }
+
+    throw new ApiError(message, res.status, retryAfterSec);
+  }
+
   return res.json() as Promise<LoginResponse>;
 }
 

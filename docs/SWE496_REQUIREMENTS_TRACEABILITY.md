@@ -16,6 +16,10 @@ Status scale:
 | FR-04 | Real-time pollution map | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` |
 | FR-05 | Zoom/pan between regions/cities/zones | 6.1.C | Partial | Google map zoom/pan implemented; region flow incomplete |
 | FR-06 | Pollutant switching (CO2/NO2/PM2.5/O3...) | 6.1.C | Partial | UI switching in `frontend/src/App.tsx` |
+| FR-03 | Role-based access (admin/analyst/viewer) | 6.1.B | Partial | Auth roles enforced for protected APIs and admin alert settings; broader module-level RBAC still expanding |
+| FR-04 | Real-time pollution map | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` (Leaflet map, state-aware markers, offline timestamp tooltips), `frontend/src/components/map/markerState.ts` (AQI-fill marker state mapping), `frontend/src/components/panels/LiveMapView.tsx` (clustered live map operations tab, playback scrubber, filter chips, saved view presets), `frontend/src/lib/liveMap.ts`, `frontend/test/markerState.test.ts`, `frontend/test/liveMap.test.ts` |
+| FR-05 | Zoom/pan between regions/cities/zones | 6.1.C | Implemented | `frontend/src/components/map/RiyadhGoogleMap.tsx` (city/sector/zone presets, fly-to, live viewport/zoom callbacks), `frontend/src/App.tsx` (bounds-aware KPI/viewing panels + hotspot fly-to wiring) |
+| FR-06 | Pollutant switching (CO2/NO2/PM2.5/O3...) | 6.1.C | Implemented | `frontend/src/App.tsx` (active pollutant drives map overlay, hotspot severity, and legend labels), `frontend/src/components/map/RiyadhGoogleMap.tsx` (metric-aware heatmap + hotspots), `frontend/src/components/map/HeatmapLayer.tsx` (generic Leaflet heat layer), `frontend/src/lib/mapMetrics.ts` (per-pollutant normalization scales), `frontend/test/mapMetrics.test.ts` |
 | FR-07 | Display AQI by region | 6.1.C | Partial | Sensor/city AQI implemented; regional aggregation incomplete |
 | FR-08 | Filter data by time, pollutant, location | 6.1.C + UC-A1 | Partial | Time and pollutant filters implemented; location filter incomplete |
 | FR-09 | Historical trends (daily/weekly/monthly) | 6.1.D + UC2 | Partial | Trend chart exists; full historical granularity incomplete |
@@ -25,8 +29,8 @@ Status scale:
 | FR-13 | Notify when thresholds are exceeded | 6.1.E + UC-A3 | Implemented | `backend/src/routes/alerts.ts`, dashboard feed/banner |
 | FR-14 | User-configurable alert thresholds | 6.1.E + UC-A4 | Implemented | API config endpoints + dashboard settings panel |
 | FR-15 | Generate structured reports | 6.1.F + UC4 | Implemented | `frontend/src/lib/reports.ts` + `ReportModal` produce CSV/JSON/printable-PDF snapshots of the live state |
-| FR-16 | Export reports in PDF/Excel | 6.1.F + UC4 | Implemented | Printable PDF via browser print dialog (`openPrintablePdf`); CSV workbook-ready export for Excel |
-| FR-17 | Schedule automated reports | 6.1.F + UC-A5 | Partial | Client-side schedule management in the Reports modal (stored in localStorage); server-side cron runner still pending |
+| FR-16 | Export reports in PDF/Excel | 6.1.F + UC4 | Implemented | `frontend/src/lib/reports.ts` now exports printable PDF plus a true `.xlsx` workbook (`Sensors`, `Alerts`, `City Trend`) via `exportSnapshotXlsx()` / `buildSnapshotWorkbook()`; `frontend/src/components/ReportModal.tsx` exposes the Excel card; `frontend/test/reports.test.ts` covers sheet shape and typed number/date cells |
+| FR-17 | Schedule automated reports | 6.1.F + UC-A5 | Partial | `frontend/src/lib/schedule-runner.ts` now detects due schedules, advances `nextRun`, formats countdown state, and dispatches exports; `frontend/src/App.tsx` runs the tab-local 5-minute schedule loop; `frontend/src/components/ReportModal.tsx` manages schedules and shows next-run countdowns; `frontend/test/schedule-runner.test.ts` covers due-run advancement and countdown behavior |
 
 ## Non-Functional Requirements
 
@@ -38,9 +42,9 @@ Status scale:
 | NFR-04 | Backups and recovery | 6.2.C | Planned | No backup automation yet |
 | NFR-05 | Authentication required | 6.2.D | Implemented | `backend/src/lib/auth.ts` guards protected routes; `backend/src/routes/telemetry.ts` now requires analyst/admin auth for ingestion; `backend/src/ws.ts` requires WebSocket auth; `simulator/src/FleetManager.ts` sends bearer auth for telemetry POSTs |
 | NFR-06 | Encrypt data at rest/in transit | 6.2.D | Planned | TLS/encryption controls pending |
-| NFR-07 | Desktop/tablet/mobile support | 6.2.E | Partial | Responsive dashboard CSS implemented |
+| NFR-07 | Desktop/tablet/mobile support | 6.2.E | Implemented | Shell extracted + responsive breakpoints at ≤1280/≤1024/≤640px. Hamburger nav, bottom-sheet side rail, RTL-aware. iPad 1024×768 verified. |
 | NFR-08 | Arabic/English interface | 6.2.E | Partial | Nav/KPIs/panels/banner/report modal translate via `frontend/src/lib/i18n.ts`; deeper labels and validation messages still English |
-| NFR-09 | Intuitive interface | 6.2.E | Partial | Redesigned dashboard complete; usability validation pending |
+| NFR-09 | Intuitive interface | 6.2.E | Partial | Redesigned dashboard complete; overview side rail now extracted into dedicated panel files (`frontend/src/components/panels/EventBanner.tsx`, `AlertSettingsPanel.tsx`, `HotspotsPanel.tsx`, `PollutantsPanel.tsx`, `WeatherPanel.tsx`, `ForecastPanel.tsx`, `SourcesPanel.tsx`, `FeedPanel.tsx`) with shared empty-state/interaction styling in `frontend/src/index.css`; usability validation still pending |
 | NFR-10 | Admin logging/error monitoring | 6.2.F | Partial | API logs/errors exist; centralized observability pending |
 | NFR-11 | Non-disruptive updates | 6.2.F | Partial | Not formally automated yet |
 | NFR-12 | Major browser support | 6.2.G | Partial | React/Vite compatible; cross-browser QA pending |
@@ -50,7 +54,7 @@ Status scale:
 
 | Use Case | Status | Notes |
 | --- | --- | --- |
-| UC1 Real-Time Map | Partial | Core implemented, some edge flows pending |
+| UC1 Real-Time Map | Partial | Drill-down, viewport-aware counts, drone-state marker cues, and pollutant-driven heat/hotspot switching are implemented; fuller regional aggregation is still pending |
 | UC2 Historical Trends | Partial | Core charting implemented, richer data controls pending |
 | UC3 Forecast | Partial | UI present, production forecasting pipeline pending |
 | UC4 Generate Reports | Implemented | Reports modal (topbar + left nav) exports CSV / JSON / print-to-PDF of live snapshot |
@@ -58,7 +62,7 @@ Status scale:
 | UC-A2 Identify Hotspots | Implemented | Active in API + map rendering |
 | UC-A3 Receive Alerts | Implemented | Active threshold-based alerts and feed |
 | UC-A4 Set Alert Thresholds | Implemented | Completed in this iteration |
-| UC-A5 Schedule Report | Partial | Client-side schedule creation in Reports modal; background execution not yet automated |
+| UC-A5 Schedule Report | Partial | Reports modal stores schedules locally and now executes them while the dashboard tab remains open; backend persistence/cron execution is still pending |
 | UC-A6 Log In | Implemented | Login/session/token flow + lockout policy (5 failures in 10 min → 15 min lock with `Retry-After` header), `POST /api/auth/logout`, and `/api/auth/me` permission payload |
 
 ## This Iteration (2026-04-24)
@@ -106,3 +110,42 @@ Delivered requirement slice:
 - FR-03: module-level RBAC now has a shared `AuthPermissions` contract, backend permission matrix, `/api/auth/me` permission payload, and explicit role guards across alerts, analytics, and telemetry routes.
 - NFR-05: telemetry ingestion now requires an authenticated analyst/admin bearer token, and the simulator attaches its default analyst token when posting fleet telemetry.
 - UC-A6 hardening: `/api/auth/me` now returns `{ user, permissions }` so the frontend can render role-appropriate controls without duplicating backend policy.
+## Iteration (2026-04-25 — Oussama · map drill-down)
+
+Delivered requirement slice:
+
+- FR-05: implemented map drill-down controls (`City` / `Sector` / `Zone`), hotspot fly-to at zoom 14, and live zoom display wiring (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/App.tsx`).
+- UC1: strengthened real-time map exploration by propagating map bounds to the shell and applying viewport-aware sensor counts in KPI and map viewing panels (`frontend/src/App.tsx`).
+- FR-10 UI compatibility hardening: hotspot circles now consume `radiusKm` when present with safe fallback radius to preserve rendering across backend payload versions (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/App.tsx`).
+
+## Iteration (2026-04-25 — Oussama · drone-state markers)
+
+Delivered requirement slice:
+
+- FR-04: encoded `OFFLINE`, `LOW_BATTERY`, `GATHERING_DATA`, and `EN_ROUTE` marker cues in the Leaflet map while preserving AQI band fill (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/components/map/markerState.ts`, `frontend/src/index.css`).
+- UC1: strengthened live map diagnostics with offline timestamp tooltips/popup labels and added frontend unit coverage for the marker-state mapping (`frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/test/markerState.test.ts`).
+
+## Iteration (2026-04-25 — Oussama · pollutant map switching)
+
+Delivered requirement slice:
+
+- FR-06: implemented real pollutant-driven map switching so the active metric now controls heatmap intensity, hotspot severity, and legend labels across PM2.5, CO2, NO2, temperature, humidity, and battery (`frontend/src/App.tsx`, `frontend/src/components/map/RiyadhGoogleMap.tsx`, `frontend/src/components/map/HeatmapLayer.tsx`, `frontend/src/lib/mapMetrics.ts`).
+- UC1: strengthened live map exploration by stabilizing sensor projection on inert snapshots and adding frontend unit coverage for the per-metric normalization/banding rules (`frontend/src/App.tsx`, `frontend/test/mapMetrics.test.ts`).
+
+## Iteration (2026-05-13 — Imad · reports-xlsx-export)
+
+Delivered requirement slice:
+
+- FR-16 / UC4: replaced the faux Excel path with a true browser-generated `.xlsx` workbook in `frontend/src/lib/reports.ts`, exposed it in `frontend/src/components/ReportModal.tsx`, and added workbook unit coverage in `frontend/test/reports.test.ts`.
+
+## Iteration (2026-05-13 — Imad · panels-side-rail-extraction)
+
+Delivered requirement slice:
+
+- NFR-09 partial hardening: extracted the overview side rail from `frontend/src/components/Dashboard.tsx` into dedicated panel files under `frontend/src/components/panels/` and added shared panel field/empty-state/row-animation styling in `frontend/src/index.css`.
+
+## Iteration (2026-05-13 — Imad · report-schedule-runner)
+
+Delivered requirement slice:
+
+- FR-17 / UC-A5 partial hardening: added the tab-local schedule runner in `frontend/src/lib/schedule-runner.ts`, mounted app-level execution in `frontend/src/App.tsx`, exposed next-run countdowns in `frontend/src/components/ReportModal.tsx`, and added scheduler unit coverage in `frontend/test/schedule-runner.test.ts`.

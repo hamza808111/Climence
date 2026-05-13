@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Calendar, Download, FileText, Sparkles, X } from 'lucide-react';
 import {
   exportSnapshotCsv,
   exportSnapshotJson,
+  exportSnapshotXlsx,
   loadScheduledReports,
   nextRunIso,
   openPrintablePdf,
@@ -10,7 +11,8 @@ import {
   type ReportPayload,
   type ScheduledReport,
 } from '../lib/reports';
-import { translate, type Locale } from '../lib/i18n';
+import { describeScheduleCountdown } from '../lib/schedule-runner';
+import { formatDateTime, tFormat, translate, type Locale } from '../lib/i18n';
 
 interface Props {
   open: boolean;
@@ -23,8 +25,15 @@ export function ReportModal({ open, onClose, payload, locale }: Props) {
   const [schedules, setSchedules] = useState<ScheduledReport[]>(() => loadScheduledReports());
   const [cadence, setCadence] = useState<ScheduledReport['cadence']>('daily');
   const [format, setFormat] = useState<ScheduledReport['format']>('pdf');
+  const [now, setNow] = useState(() => new Date());
 
   const t = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+
+  useEffect(() => {
+    if (!open) return;
+    const timer = window.setInterval(() => setNow(new Date()), 60000);
+    return () => window.clearInterval(timer);
+  }, [open]);
 
   if (!open) return null;
 
@@ -49,11 +58,11 @@ export function ReportModal({ open, onClose, payload, locale }: Props) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={event => event.stopPropagation()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="report-modal-title" onClick={event => event.stopPropagation()}>
         <div className="modal-head">
           <div>
-            <div className="eyebrow">FR-15 · FR-16 · UC-A5</div>
-            <h3>{t('report.title')}</h3>
+            <div className="eyebrow">{t('report.subtitleTag')}</div>
+            <h3 id="report-modal-title">{t('report.title')}</h3>
             <p className="modal-sub">{t('report.subtitle')}</p>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label={t('report.close')}>
@@ -67,7 +76,7 @@ export function ReportModal({ open, onClose, payload, locale }: Props) {
               <div className="format-icon"><FileText size={18} /></div>
               <div>
                 <div className="format-name">{t('report.pdf')}</div>
-                <div className="format-desc">Opens in a new tab, ready to print / save as PDF.</div>
+                <div className="format-desc">{t('report.desc.pdf')}</div>
               </div>
               <Download size={14} className="format-cta" />
             </button>
@@ -75,7 +84,7 @@ export function ReportModal({ open, onClose, payload, locale }: Props) {
               <div className="format-icon"><Download size={18} /></div>
               <div>
                 <div className="format-name">{t('report.csv')}</div>
-                <div className="format-desc">Sensors, alerts, hotspots, city trend — one workbook-friendly file.</div>
+                <div className="format-desc">{t('report.desc.csv')}</div>
               </div>
               <Download size={14} className="format-cta" />
             </button>
@@ -83,7 +92,15 @@ export function ReportModal({ open, onClose, payload, locale }: Props) {
               <div className="format-icon"><FileText size={18} /></div>
               <div>
                 <div className="format-name">{t('report.json')}</div>
-                <div className="format-desc">Full structured snapshot + derived metrics for integrations.</div>
+                <div className="format-desc">{t('report.desc.json')}</div>
+              </div>
+              <Download size={14} className="format-cta" />
+            </button>
+            <button className="format-card" onClick={() => exportSnapshotXlsx(payload)}>
+              <div className="format-icon"><FileText size={18} /></div>
+              <div>
+                <div className="format-name">{t('report.xlsx')}</div>
+                <div className="format-desc">{t('report.desc.xlsx')}</div>
               </div>
               <Download size={14} className="format-cta" />
             </button>
@@ -107,7 +124,7 @@ export function ReportModal({ open, onClose, payload, locale }: Props) {
                 ))}
               </div>
               <div className="seg">
-                {(['pdf', 'csv', 'json'] as const).map(value => (
+                {(['pdf', 'csv', 'json', 'xlsx'] as const).map(value => (
                   <button
                     key={value}
                     className={`seg-btn ${format === value ? 'active' : ''}`}
@@ -135,10 +152,17 @@ export function ReportModal({ open, onClose, payload, locale }: Props) {
                     <div>
                       <div className="sched-label">{item.label}</div>
                       <div className="sched-next">
-                        {t('report.nextRun')} · {new Date(item.nextRun).toLocaleString()}
+                        {t('report.nextRun')} · {formatDateTime(item.nextRun, locale)}
+                      </div>
+                      <div className="sched-next">
+                        {(() => {
+                          const countdown = describeScheduleCountdown(item.nextRun, now);
+                          if (countdown.bucket === 'now') return t('report.countdown.now');
+                          return tFormat(`report.countdown.${countdown.bucket}` as const, locale, { value: countdown.value ?? 0 });
+                        })()}
                       </div>
                     </div>
-                    <button className="icon-btn" onClick={() => handleRemoveSchedule(item.id)} aria-label="Remove schedule">
+                    <button className="icon-btn" onClick={() => handleRemoveSchedule(item.id)} aria-label={t('report.removeSchedule')}>
                       <X size={13} />
                     </button>
                   </li>
